@@ -139,11 +139,6 @@ function init_globals() {
 }
 
 function verify_requirements() {
-    if [ "$#" -ne 1 ]; then
-        usage
-        return $FAILURE
-    fi
-
     if [ "$EUID" -ne 0 ]; then
         echo "ERROR: Please run as root"
         return $FAILURE
@@ -163,10 +158,15 @@ function verify_requirements() {
 }
 
 function main() {
-    verify_requirements $@
-    local l_action="$1"
-    init_globals "config.local"
+    if [ "$#" -ne 1 ]; then
+        usage
+        return $FAILURE
+    fi
 
+    init_globals "config.local"
+    verify_requirements $@
+
+    local l_action="$1"
     case "$l_action" in
     start)
         system_on
