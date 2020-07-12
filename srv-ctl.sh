@@ -100,23 +100,36 @@ function start_service() {
     fi
 }
 
-function system_on() {
-    stop_service "$ST_SERVICE"
-
+function unlock_and_mount_all() {
     unlock_and_mount_device "$ST_HOME_DATA_DEV" "$ST_HOME_DATA_MAPPER" "$ST_HOME_DATA_MOUNT" "no_key_file"
     unlock_and_mount_device "$ST_STORAGE_DATA_DEV" "$ST_STORAGE_DATA_MAPPER" "$ST_STORAGE_DATA_MOUNT" "$ST_STORAGE_DATA_KEY_FILE"
+}
 
+function lock_and_unmount_all() {
+    lock_and_unmount_device "$ST_STORAGE_DATA_DEV" "$ST_STORAGE_DATA_MAPPER" "$ST_STORAGE_DATA_MOUNT"
+    lock_and_unmount_device "$ST_HOME_DATA_DEV" "$ST_HOME_DATA_MAPPER" "$ST_HOME_DATA_MOUNT"
+}
+
+start_all_services() {
     start_service "$ST_SERVICE"
+}
+
+stop_all_services() {
+    stop_service "$ST_SERVICE"
+}
+
+function system_on() {
+    stop_all_services
+    unlock_and_mount_all
+    start_all_services
 
     echo "========================"
     echo -e "   ST System is ON :)\n"
 }
 
 function system_off() {
-    stop_service "$ST_SERVICE"
-
-    lock_and_unmount_device "$ST_STORAGE_DATA_DEV" "$ST_STORAGE_DATA_MAPPER" "$ST_STORAGE_DATA_MOUNT"
-    lock_and_unmount_device "$ST_HOME_DATA_DEV" "$ST_HOME_DATA_MAPPER" "$ST_HOME_DATA_MOUNT"
+    stop_all_services
+    lock_and_unmount_all
 
     echo "========================"
     echo -e "   ST System is OFF :)\n"
@@ -173,6 +186,12 @@ function main() {
         ;;
     stop)
         system_off
+        ;;
+    unlock-only)
+        unlock_and_mount_all
+        ;;
+    stop-services-only)
+        stop_all_services
         ;;
     *)
         usage
