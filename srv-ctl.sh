@@ -10,23 +10,23 @@ function usage() {
 }
 
 function wait_for_device() {
-    local l_device="$1"
+    local l_device_uuid="$1"
 
     for i in {1..5}; do
-        if ls "/dev/disk/by-uuid/$l_device" >/dev/null; then
+        if ls "/dev/disk/by-uuid/$l_device_uuid" >/dev/null; then
             return $SUCCESS
         else
-            echo "Waiting for device $l_device... ${i}s"
+            echo "Waiting for device $l_device_uuid... ${i}s"
             sleep 1
         fi
     done
 
-    echo "ERROR: Device \"$l_device\" is not available."
+    echo "ERROR: Device \"$l_device_uuid\" is not available."
     return $FAILURE
 }
 
 function unlock_and_mount_device() {
-    local l_device=$1
+    local l_device_uuid=$1
     local l_mapper=$2
     local l_mount=$3
     local l_key_file=$4
@@ -35,14 +35,12 @@ function unlock_and_mount_device() {
         echo -e "Partition \"$l_mapper\" unlocked. Skipping.\n"
     else
         echo "Unlocking $l_mapper..."
-        wait_for_device "$l_device"
+        wait_for_device "$l_device_uuid"
 
         if [ -f "$l_key_file" ]; then
-            # cryptsetup luksOpen "/dev/$l_device" "$l_mapper" --key-file="$l_key_file"
-            cryptsetup luksOpen "/dev/disk/by-uuid/$l_device" "$l_mapper" --key-file="$l_key_file"
+            cryptsetup luksOpen "/dev/disk/by-uuid/$l_device_uuid" "$l_mapper" --key-file="$l_key_file"
         else
-            # cryptsetup luksOpen "/dev/$l_device" "$l_mapper"
-            cryptsetup luksOpen "/dev/disk/by-uuid/$l_device" "$l_mapper"
+            cryptsetup luksOpen "/dev/disk/by-uuid/$l_device_uuid" "$l_mapper"
         fi
 
         echo -e "Done\n"
@@ -59,7 +57,7 @@ function unlock_and_mount_device() {
 }
 
 function lock_and_unmount_device() {
-    local l_device=$1
+    local l_device_uuid=$1
     local l_mapper=$2
     local l_mount=$3
 
