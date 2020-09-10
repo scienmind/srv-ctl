@@ -1,8 +1,10 @@
-readonly ST_STORAGE_DATA_DEV="sdX"
+# readonly ST_STORAGE_DATA_DEV="sdX"
+readonly ST_STORAGE_DATA_UUID="DISK_X_UUID"
 readonly ST_STORAGE_DATA_MAPPER="HDD_EXT"
 readonly ST_STORAGE_DATA_MOUNT="srv_mass_storage"
 
-readonly ST_HOME_DATA_DEV="sdY"
+# readonly ST_HOME_DATA_DEV="sdY"
+readonly ST_HOME_DATA_UUID="DISK_Y_UUID"
 readonly ST_HOME_DATA_MAPPER="SSD_EXT"
 readonly ST_HOME_DATA_MOUNT="srv_rapid_storage"
 readonly ST_STORAGE_DATA_KEY_FILE="mass_storage_key_file_path"

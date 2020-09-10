@@ -13,7 +13,7 @@ function wait_for_device() {
     local l_device="$1"
 
     for i in {1..5}; do
-        if ls "/dev/$l_device" >/dev/null; then
+        if ls "/dev/disk/by-uuid/$l_device" >/dev/null; then
             return $SUCCESS
         else
             echo "Waiting for device $l_device... ${i}s"
@@ -38,9 +38,11 @@ function unlock_and_mount_device() {
         wait_for_device "$l_device"
 
         if [ -f "$l_key_file" ]; then
-            cryptsetup luksOpen "/dev/$l_device" "$l_mapper" --key-file="$l_key_file"
+            # cryptsetup luksOpen "/dev/$l_device" "$l_mapper" --key-file="$l_key_file"
+            cryptsetup luksOpen "/dev/disk/by-uuid/$l_device" "$l_mapper" --key-file="$l_key_file"
         else
-            cryptsetup luksOpen "/dev/$l_device" "$l_mapper"
+            # cryptsetup luksOpen "/dev/$l_device" "$l_mapper"
+            cryptsetup luksOpen "/dev/disk/by-uuid/$l_device" "$l_mapper"
         fi
 
         echo -e "Done\n"
@@ -101,13 +103,13 @@ function start_service() {
 }
 
 function unlock_and_mount_all() {
-    unlock_and_mount_device "$ST_HOME_DATA_DEV" "$ST_HOME_DATA_MAPPER" "$ST_HOME_DATA_MOUNT" "no_key_file"
-    unlock_and_mount_device "$ST_STORAGE_DATA_DEV" "$ST_STORAGE_DATA_MAPPER" "$ST_STORAGE_DATA_MOUNT" "$ST_STORAGE_DATA_KEY_FILE"
+    unlock_and_mount_device "$ST_HOME_DATA_UUID" "$ST_HOME_DATA_MAPPER" "$ST_HOME_DATA_MOUNT" "no_key_file"
+    unlock_and_mount_device "$ST_STORAGE_DATA_UUID" "$ST_STORAGE_DATA_MAPPER" "$ST_STORAGE_DATA_MOUNT" "$ST_STORAGE_DATA_KEY_FILE"
 }
 
 function lock_and_unmount_all() {
-    lock_and_unmount_device "$ST_STORAGE_DATA_DEV" "$ST_STORAGE_DATA_MAPPER" "$ST_STORAGE_DATA_MOUNT"
-    lock_and_unmount_device "$ST_HOME_DATA_DEV" "$ST_HOME_DATA_MAPPER" "$ST_HOME_DATA_MOUNT"
+    lock_and_unmount_device "$ST_STORAGE_DATA_UUID" "$ST_STORAGE_DATA_MAPPER" "$ST_STORAGE_DATA_MOUNT"
+    lock_and_unmount_device "$ST_HOME_DATA_UUID" "$ST_HOME_DATA_MAPPER" "$ST_HOME_DATA_MOUNT"
 }
 
 start_all_services() {
