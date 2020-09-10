@@ -5,7 +5,7 @@ readonly SUCCESS=0
 readonly FAILURE=1
 
 function usage() {
-    echo "Usage:   $0  start | stop"
+    echo "Usage:   $0  start | stop | unlock-only | stop-services-only"
     return $FAILURE
 }
 
