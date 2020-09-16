@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -eou pipefail
 
 readonly SUCCESS=0
