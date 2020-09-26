@@ -101,13 +101,13 @@ function start_service() {
 }
 
 function unlock_and_mount_all() {
-    unlock_and_mount_device "$ST_HOME_DATA_UUID" "$ST_HOME_DATA_MAPPER" "$ST_HOME_DATA_MOUNT" "no_key_file"
-    unlock_and_mount_device "$ST_STORAGE_DATA_UUID" "$ST_STORAGE_DATA_MAPPER" "$ST_STORAGE_DATA_MOUNT" "$ST_STORAGE_DATA_KEY_FILE"
+    unlock_and_mount_device "$ACTIVE_DATA_UUID" "$ACTIVE_DATA_MAPPER" "$ACTIVE_DATA_MOUNT" "no_key_file"
+    unlock_and_mount_device "$STORAGE_DATA_UUID" "$STORAGE_DATA_MAPPER" "$STORAGE_DATA_MOUNT" "$STORAGE_DATA_KEY_FILE"
 }
 
 function lock_and_unmount_all() {
-    lock_and_unmount_device "$ST_STORAGE_DATA_UUID" "$ST_STORAGE_DATA_MAPPER" "$ST_STORAGE_DATA_MOUNT"
-    lock_and_unmount_device "$ST_HOME_DATA_UUID" "$ST_HOME_DATA_MAPPER" "$ST_HOME_DATA_MOUNT"
+    lock_and_unmount_device "$STORAGE_DATA_UUID" "$STORAGE_DATA_MAPPER" "$STORAGE_DATA_MOUNT"
+    lock_and_unmount_device "$ACTIVE_DATA_UUID" "$ACTIVE_DATA_MAPPER" "$ACTIVE_DATA_MOUNT"
 }
 
 start_all_services() {
@@ -163,7 +163,7 @@ function verify_requirements() {
     fi
 
     local l_cryptsetup_version_major_current="$(cryptsetup --version | cut -d" " -f2 | cut -d"." -f1)"
-    local l_cryptsetup_version_major_required="$ST_LUKS_MIN_VERSION"
+    local l_cryptsetup_version_major_required="$LUKS_MIN_VERSION"
     if [ "$l_cryptsetup_version_major_current" -lt "$l_cryptsetup_version_major_required" ]; then
         echo "ERROR: Unsupported version of 'cryptsetup' utility, please use version $l_cryptsetup_version_major_required or newer"
         return $FAILURE
