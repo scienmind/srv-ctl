@@ -26,10 +26,12 @@ function wait_for_device() {
 }
 
 function unlock_and_mount_device() {
-    local l_device_uuid=$1
-    local l_mapper=$2
-    local l_mount=$3
-    local l_key_file=$4
+    local l_lvm_name=$1
+    local l_lvm_group=$2
+    local l_device_uuid=$3
+    local l_mapper=$4
+    local l_mount=$5
+    local l_key_file=$6
 
     if cryptsetup status "$l_mapper" >/dev/null; then
         echo -e "Partition \"$l_mapper\" unlocked. Skipping.\n"
@@ -57,9 +59,11 @@ function unlock_and_mount_device() {
 }
 
 function lock_and_unmount_device() {
-    local l_device_uuid=$1
-    local l_mapper=$2
-    local l_mount=$3
+    local l_lvm_name=$1
+    local l_lvm_group=$2
+    local l_device_uuid=$3
+    local l_mapper=$4
+    local l_mount=$5
 
     if mountpoint -q "/mnt/$l_mount"; then
         echo "Unmounting $l_mount..."
@@ -101,13 +105,23 @@ function start_service() {
 }
 
 function unlock_and_mount_all() {
-    unlock_and_mount_device "$ACTIVE_DATA_UUID" "$ACTIVE_DATA_MAPPER" "$ACTIVE_DATA_MOUNT" "no_key_file"
-    unlock_and_mount_device "$STORAGE_DATA_UUID" "$STORAGE_DATA_MAPPER" "$STORAGE_DATA_MOUNT" "$STORAGE_DATA_KEY_FILE"
+    unlock_and_mount_device \
+        "no_lvm_name" "no_lvm_group" \
+        "$ACTIVE_DATA_UUID" "$ACTIVE_DATA_MAPPER" "$ACTIVE_DATA_MOUNT" \
+        "no_key_file"
+    unlock_and_mount_device \
+        "$STORAGE_DATA_LVM_NAME" "$STORAGE_DATA_LVM_GROUP" \
+        "$STORAGE_DATA_UUID" "$STORAGE_DATA_MAPPER" "$STORAGE_DATA_MOUNT" \
+        "$STORAGE_DATA_KEY_FILE"
 }
 
 function lock_and_unmount_all() {
-    lock_and_unmount_device "$STORAGE_DATA_UUID" "$STORAGE_DATA_MAPPER" "$STORAGE_DATA_MOUNT"
-    lock_and_unmount_device "$ACTIVE_DATA_UUID" "$ACTIVE_DATA_MAPPER" "$ACTIVE_DATA_MOUNT"
+    lock_and_unmount_device \
+        "$STORAGE_DATA_LVM_NAME" "$STORAGE_DATA_LVM_GROUP" \
+        "$STORAGE_DATA_UUID" "$STORAGE_DATA_MAPPER" "$STORAGE_DATA_MOUNT"
+    lock_and_unmount_device \
+        "no_lvm_name" "no_lvm_group" \
+        "$ACTIVE_DATA_UUID" "$ACTIVE_DATA_MAPPER" "$ACTIVE_DATA_MOUNT"
 }
 
 start_all_services() {
