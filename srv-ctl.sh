@@ -25,18 +25,58 @@ function wait_for_device() {
     return $FAILURE
 }
 
-function activate_lvm() {
+function verify_lvm() {
     local l_lvm_name=$1
     local l_lvm_group=$2
 
-    #TODO: implement
+    if lvdisplay "$l_lvm_group/$l_lvm_name" >/dev/null; then
+        return $SUCCESS
+    fi
+
+    echo "ERROR: Logic volume \"$l_device_uuid\" is not available."
+    return $FAILURE
+}
+
+function activate_lvm() {
+    local l_lvm_name=$1
+    local l_lvm_group=$2
+    local l_lvm_status
+
+    if [ "$l_lvm_name" == "none" ] || [ "$l_lvm_group" == "none" ]; then
+        return $SUCCESS
+    fi
+
+    verify_lvm "$l_lvm_name" "$l_lvm_group"
+    l_lvm_status=$(lvdisplay "$l_lvm_group/$l_lvm_name" | grep 'Status' | grep -v -c 'NOT available')
+
+    if [ "$l_lvm_status" -eq "1" ]; then
+        echo -e "Logic volume \"$l_lvm_name\" already activated. Skipping.\n"
+    else
+        echo "Activating $l_lvm_name..."
+        lvchange -ay "$l_lvm_group/$l_lvm_name"
+        echo -e "Done\n"
+    fi
 }
 
 function deactivate_lvm() {
     local l_lvm_name=$1
     local l_lvm_group=$2
+    local l_lvm_status
 
-    #TODO: implement
+    if [ "$l_lvm_name" == "none" ] || [ "$l_lvm_group" == "none" ]; then
+        return $SUCCESS
+    fi
+
+    verify_lvm "$l_lvm_name" "$l_lvm_group"
+    l_lvm_status=$(lvdisplay "$l_lvm_group/$l_lvm_name" | grep 'Status' | grep -v -c 'NOT available')
+
+    if [ "$l_lvm_status" -eq "1" ]; then
+        echo "Deactivating $l_lvm_name..."
+        lvchange -an "$l_lvm_group/$l_lvm_name"
+        echo -e "Done\n"
+    else
+        echo -e "Logic volume \"$l_lvm_name\" already deactivated. Skipping.\n"
+    fi
 }
 
 function unlock_device() {
@@ -157,11 +197,15 @@ function close_all_devices() {
 }
 
 start_all_services() {
-    start_service "$ST_SERVICE"
+    if [ "$ST_SERVICE" != "none" ]; then
+        start_service "$ST_SERVICE"
+    fi
 }
 
 stop_all_services() {
-    stop_service "$ST_SERVICE"
+    if [ "$ST_SERVICE" != "none" ]; then
+        stop_service "$ST_SERVICE"
+    fi
 }
 
 function system_on() {
@@ -198,13 +242,19 @@ function init_globals() {
 }
 
 function verify_requirements() {
-    if [ "$EUID" -ne 0 ]; then
+    if [ "$EUID" -ne "0" ]; then
         echo "ERROR: Please run as root"
         return $FAILURE
     fi
 
     if ! command -v cryptsetup &>/dev/null; then
         echo "ERROR: 'cryptsetup' utility is not available"
+        return $FAILURE
+    fi
+
+    if [ "$STORAGE_DATA_LVM_NAME" != "none" ] &&
+        command -v lvdisplay &>/dev/null; then
+        echo "ERROR: 'lvm2' utility is not available"
         return $FAILURE
     fi
 

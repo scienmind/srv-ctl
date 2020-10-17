@@ -10,8 +10,8 @@ readonly ACTIVE_DATA_MOUNT="srv_rapid_storage"
 # Storage device for data at rest
 # -----------------------------------------------------------------------------
 
-readonly STORAGE_DATA_LVM_NAME="logic_volume_name"
-readonly STORAGE_DATA_LVM_GROUP="logic_volume_group"
+readonly STORAGE_DATA_LVM_NAME="logic_volume_name"   # set to "none" if not used
+readonly STORAGE_DATA_LVM_GROUP="logic_volume_group" # set to "none" if not used
 
 readonly STORAGE_DATA_KEY_FILE="mass_storage_key_file_path"
 
@@ -25,5 +25,5 @@ readonly STORAGE_DATA_MOUNT="srv_mass_storage"
 
 readonly LUKS_MIN_VERSION="2"
 
-readonly ST_USER="your-syncthing-user"
-readonly ST_SERVICE="syncthing@${ST_USER}.service"
+readonly ST_USER="your-syncthing-user"             # set to "none" if not used
+readonly ST_SERVICE="syncthing@${ST_USER}.service" # set to "none" if not used
