@@ -174,7 +174,7 @@ function start_service() {
 
 function open_all_devices() {
     # open active data device
-    activate_lvm "no_lvm_name" "no_lvm_group"
+    activate_lvm "none" "none"
     unlock_device "$ACTIVE_DATA_UUID" "$ACTIVE_DATA_MAPPER" "no_key_file"
     mount_device "$ACTIVE_DATA_MAPPER" "$ACTIVE_DATA_MOUNT"
 
@@ -193,7 +193,7 @@ function close_all_devices() {
     # close active data device
     unmount_device "$ACTIVE_DATA_MOUNT"
     lock_device "$ACTIVE_DATA_MAPPER"
-    deactivate_lvm "no_lvm_name" "no_lvm_group"
+    deactivate_lvm "none" "none"
 }
 
 start_all_services() {
