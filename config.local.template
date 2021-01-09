@@ -2,7 +2,7 @@
 # Storage device for active working data
 # -----------------------------------------------------------------------------
 
-readonly ACTIVE_DATA_UUID="DISK_Y_UUID"
+readonly ACTIVE_DATA_UUID="DISK_Y_UUID" # Reported by: `sudo blkid /dev/<device>`
 readonly ACTIVE_DATA_MAPPER="SSD_EXT"
 readonly ACTIVE_DATA_MOUNT="srv_rapid_storage"
 
@@ -15,7 +15,7 @@ readonly STORAGE_DATA_LVM_GROUP="logic_volume_group" # set to "none" if not used
 
 readonly STORAGE_DATA_KEY_FILE="mass_storage_key_file_path"
 
-readonly STORAGE_DATA_UUID="DISK_X_UUID"
+readonly STORAGE_DATA_UUID="DISK_X_UUID" # Reported by: `sudo blkid /dev/<device>`
 readonly STORAGE_DATA_MAPPER="HDD_EXT"
 readonly STORAGE_DATA_MOUNT="srv_mass_storage"
 
