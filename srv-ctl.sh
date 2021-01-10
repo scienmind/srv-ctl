@@ -5,7 +5,7 @@ readonly SUCCESS=0
 readonly FAILURE=1
 
 function usage() {
-    echo "Usage:   $0  start | stop | unlock-only | stop-services-only"
+    echo "Usage:   $0  start | stop | unlock-only | stop-services-only | --help | -h"
     return $FAILURE
 }
 
@@ -220,7 +220,7 @@ function system_on() {
     start_all_services
 
     echo "========================"
-    echo -e "   ST System is ON :)\n"
+    echo -e "   System is ON :)\n"
 }
 
 function system_off() {
@@ -228,7 +228,7 @@ function system_off() {
     close_all_devices
 
     echo "========================"
-    echo -e "   ST System is OFF :)\n"
+    echo -e "   System is OFF :)\n"
 }
 
 function init_globals() {
@@ -296,6 +296,12 @@ function main() {
         ;;
     stop-services-only)
         stop_all_services
+        ;;
+    --help)
+        usage
+        ;;
+    -h)
+        usage
         ;;
     *)
         usage
