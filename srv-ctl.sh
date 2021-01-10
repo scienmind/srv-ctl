@@ -5,7 +5,7 @@ readonly SUCCESS=0
 readonly FAILURE=1
 
 function usage() {
-    echo "Usage:   $0  start | stop | unlock-only | stop-services-only"
+    echo "Usage:   $0  < start | stop | unlock-only | stop-services-only | help | -h >"
     return $FAILURE
 }
 
@@ -25,11 +25,70 @@ function wait_for_device() {
     return $FAILURE
 }
 
-function unlock_and_mount_device() {
+function verify_lvm() {
+    local l_lvm_name=$1
+    local l_lvm_group=$2
+
+    if lvdisplay "$l_lvm_group/$l_lvm_name" >/dev/null; then
+        return $SUCCESS
+    fi
+
+    echo "ERROR: Logic volume \"$l_device_uuid\" is not available."
+    return $FAILURE
+}
+
+function lvm_is_active() {
+    local l_lvm_name=$1
+    local l_lvm_group=$2
+
+    if lvdisplay "$l_lvm_group/$l_lvm_name" | grep 'Status' | grep -v -c 'NOT available' >/dev/null; then
+        return $SUCCESS
+    else
+        return $FAILURE
+    fi
+}
+
+function activate_lvm() {
+    local l_lvm_name=$1
+    local l_lvm_group=$2
+
+    if [ "$l_lvm_name" == "none" ] || [ "$l_lvm_group" == "none" ]; then
+        return $SUCCESS
+    fi
+
+    verify_lvm "$l_lvm_name" "$l_lvm_group"
+    if lvm_is_active "$l_lvm_name" "$l_lvm_group"; then
+        echo -e "Logic volume \"$l_lvm_name\" already activated. Skipping.\n"
+    else
+        echo "Activating $l_lvm_name..."
+        lvchange -ay "$l_lvm_group/$l_lvm_name"
+        echo -e "Done\n"
+    fi
+}
+
+function deactivate_lvm() {
+    local l_lvm_name=$1
+    local l_lvm_group=$2
+
+    if [ "$l_lvm_name" == "none" ] || [ "$l_lvm_group" == "none" ]; then
+        return $SUCCESS
+    fi
+
+    verify_lvm "$l_lvm_name" "$l_lvm_group"
+
+    if lvm_is_active "$l_lvm_name" "$l_lvm_group"; then
+        echo "Deactivating $l_lvm_name..."
+        lvchange -an "$l_lvm_group/$l_lvm_name"
+        echo -e "Done\n"
+    else
+        echo -e "Logic volume \"$l_lvm_name\" already deactivated. Skipping.\n"
+    fi
+}
+
+function unlock_device() {
     local l_device_uuid=$1
     local l_mapper=$2
-    local l_mount=$3
-    local l_key_file=$4
+    local l_key_file=$3
 
     if cryptsetup status "$l_mapper" >/dev/null; then
         echo -e "Partition \"$l_mapper\" unlocked. Skipping.\n"
@@ -45,6 +104,23 @@ function unlock_and_mount_device() {
 
         echo -e "Done\n"
     fi
+}
+
+function lock_device() {
+    local l_mapper=$1
+
+    if cryptsetup status "$l_mapper" >/dev/null; then
+        echo "Locking $l_mapper..."
+        cryptsetup luksClose "$l_mapper"
+        echo -e "Done\n"
+    else
+        echo -e "Partition \"$l_mapper\" locked. Skipping.\n"
+    fi
+}
+
+function mount_device() {
+    local l_mapper=$1
+    local l_mount=$2
 
     if mountpoint -q "/mnt/$l_mount"; then
         echo -e "Mountpoint \"$l_mount\" mounted. Skipping.\n"
@@ -56,10 +132,8 @@ function unlock_and_mount_device() {
     fi
 }
 
-function lock_and_unmount_device() {
-    local l_device_uuid=$1
-    local l_mapper=$2
-    local l_mount=$3
+function unmount_device() {
+    local l_mount=$1
 
     if mountpoint -q "/mnt/$l_mount"; then
         echo "Unmounting $l_mount..."
@@ -68,18 +142,21 @@ function lock_and_unmount_device() {
     else
         echo -e "Mountpoint \"$l_mount\" unmounted. Skipping.\n"
     fi
+}
 
-    if cryptsetup status "$l_mapper" >/dev/null; then
-        echo "Locking $l_mapper..."
-        cryptsetup luksClose "$l_mapper"
-        echo -e "Done\n"
-    else
-        echo -e "Partition \"$l_mapper\" locked. Skipping.\n"
-    fi
+function close_device() {
+    local l_lvm_name=$1
+    local l_lvm_group=$2
+    local l_mapper=$3
+    local l_mount=$4
+
+    unmount_device "$l_mount"
+    lock_device "$l_mapper"
 }
 
 function stop_service() {
     local l_service=$1
+
     echo "Stopping service..."
     if systemctl is-active --quiet "$l_service"; then
         systemctl stop "$l_service"
@@ -91,6 +168,7 @@ function stop_service() {
 
 function start_service() {
     local l_service=$1
+
     echo "Starting service..."
     if systemctl is-active --quiet "$l_service"; then
         echo -e "Service \"$l_service\" active. Skipping.\n"
@@ -100,39 +178,57 @@ function start_service() {
     fi
 }
 
-function unlock_and_mount_all() {
-    unlock_and_mount_device "$ST_HOME_DATA_UUID" "$ST_HOME_DATA_MAPPER" "$ST_HOME_DATA_MOUNT" "no_key_file"
-    unlock_and_mount_device "$ST_STORAGE_DATA_UUID" "$ST_STORAGE_DATA_MAPPER" "$ST_STORAGE_DATA_MOUNT" "$ST_STORAGE_DATA_KEY_FILE"
+function open_all_devices() {
+    # open active data device
+    activate_lvm "none" "none"
+    unlock_device "$ACTIVE_DATA_UUID" "$ACTIVE_DATA_MAPPER" "no_key_file"
+    mount_device "$ACTIVE_DATA_MAPPER" "$ACTIVE_DATA_MOUNT"
+
+    # open storage data device
+    activate_lvm "$STORAGE_DATA_LVM_NAME" "$STORAGE_DATA_LVM_GROUP"
+    unlock_device "$STORAGE_DATA_UUID" "$STORAGE_DATA_MAPPER" "$STORAGE_DATA_KEY_FILE"
+    mount_device "$STORAGE_DATA_MAPPER" "$STORAGE_DATA_MOUNT"
 }
 
-function lock_and_unmount_all() {
-    lock_and_unmount_device "$ST_STORAGE_DATA_UUID" "$ST_STORAGE_DATA_MAPPER" "$ST_STORAGE_DATA_MOUNT"
-    lock_and_unmount_device "$ST_HOME_DATA_UUID" "$ST_HOME_DATA_MAPPER" "$ST_HOME_DATA_MOUNT"
+function close_all_devices() {
+    # close storage data device
+    unmount_device "$STORAGE_DATA_MOUNT"
+    lock_device "$STORAGE_DATA_MAPPER"
+    deactivate_lvm "$STORAGE_DATA_LVM_NAME" "$STORAGE_DATA_LVM_GROUP"
+
+    # close active data device
+    unmount_device "$ACTIVE_DATA_MOUNT"
+    lock_device "$ACTIVE_DATA_MAPPER"
+    deactivate_lvm "none" "none"
 }
 
 start_all_services() {
-    start_service "$ST_SERVICE"
+    if [ "$ST_SERVICE" != "none" ]; then
+        start_service "$ST_SERVICE"
+    fi
 }
 
 stop_all_services() {
-    stop_service "$ST_SERVICE"
+    if [ "$ST_SERVICE" != "none" ]; then
+        stop_service "$ST_SERVICE"
+    fi
 }
 
 function system_on() {
     stop_all_services
-    unlock_and_mount_all
+    open_all_devices
     start_all_services
 
     echo "========================"
-    echo -e "   ST System is ON :)\n"
+    echo -e "   System is ON :)\n"
 }
 
 function system_off() {
     stop_all_services
-    lock_and_unmount_all
+    close_all_devices
 
     echo "========================"
-    echo -e "   ST System is OFF :)\n"
+    echo -e "   System is OFF :)\n"
 }
 
 function init_globals() {
@@ -152,7 +248,7 @@ function init_globals() {
 }
 
 function verify_requirements() {
-    if [ "$EUID" -ne 0 ]; then
+    if [ "$EUID" -ne "0" ]; then
         echo "ERROR: Please run as root"
         return $FAILURE
     fi
@@ -162,8 +258,15 @@ function verify_requirements() {
         return $FAILURE
     fi
 
+    if [ "$STORAGE_DATA_LVM_NAME" != "none" ] &&
+        ! command -v lvdisplay &>/dev/null; then
+        echo "ERROR: 'lvm2' utility is not available"
+        return $FAILURE
+    fi
+
     local l_cryptsetup_version_major_current="$(cryptsetup --version | cut -d" " -f2 | cut -d"." -f1)"
-    local l_cryptsetup_version_major_required="$ST_LUKS_MIN_VERSION"
+    local l_cryptsetup_version_major_required="$LUKS_MIN_VERSION"
+
     if [ "$l_cryptsetup_version_major_current" -lt "$l_cryptsetup_version_major_required" ]; then
         echo "ERROR: Unsupported version of 'cryptsetup' utility, please use version $l_cryptsetup_version_major_required or newer"
         return $FAILURE
@@ -180,6 +283,7 @@ function main() {
     verify_requirements $@
 
     local l_action="$1"
+
     case "$l_action" in
     start)
         system_on
@@ -188,10 +292,16 @@ function main() {
         system_off
         ;;
     unlock-only)
-        unlock_and_mount_all
+        open_all_devices
         ;;
     stop-services-only)
         stop_all_services
+        ;;
+    help)
+        usage
+        ;;
+    -h)
+        usage
         ;;
     *)
         usage

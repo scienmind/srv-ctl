@@ -1,13 +1,29 @@
-readonly ST_STORAGE_DATA_UUID="DISK_X_UUID"
-readonly ST_STORAGE_DATA_MAPPER="HDD_EXT"
-readonly ST_STORAGE_DATA_MOUNT="srv_mass_storage"
+# -----------------------------------------------------------------------------
+# Storage device for active working data
+# -----------------------------------------------------------------------------
 
-readonly ST_HOME_DATA_UUID="DISK_Y_UUID"
-readonly ST_HOME_DATA_MAPPER="SSD_EXT"
-readonly ST_HOME_DATA_MOUNT="srv_rapid_storage"
-readonly ST_STORAGE_DATA_KEY_FILE="mass_storage_key_file_path"
+readonly ACTIVE_DATA_UUID="DISK_Y_UUID" # Reported by: `sudo blkid /dev/<device>`
+readonly ACTIVE_DATA_MAPPER="SSD_EXT"
+readonly ACTIVE_DATA_MOUNT="srv_rapid_storage"
 
-readonly ST_LUKS_MIN_VERSION="2"
+# -----------------------------------------------------------------------------
+# Storage device for data at rest
+# -----------------------------------------------------------------------------
 
-readonly ST_USER="your-syncthing-user"
-readonly ST_SERVICE="syncthing@${ST_USER}.service"
+readonly STORAGE_DATA_LVM_NAME="logic_volume_name"   # set to "none" if not used
+readonly STORAGE_DATA_LVM_GROUP="logic_volume_group" # set to "none" if not used
+
+readonly STORAGE_DATA_KEY_FILE="mass_storage_key_file_path"
+
+readonly STORAGE_DATA_UUID="DISK_X_UUID" # Reported by: `sudo blkid /dev/<device>`
+readonly STORAGE_DATA_MAPPER="HDD_EXT"
+readonly STORAGE_DATA_MOUNT="srv_mass_storage"
+
+# -----------------------------------------------------------------------------
+# Misc system definitions
+# -----------------------------------------------------------------------------
+
+readonly LUKS_MIN_VERSION="2"
+
+readonly ST_USER="your-syncthing-user"             # set to "none" if not used
+readonly ST_SERVICE="syncthing@${ST_USER}.service" # set to "none" if not used
