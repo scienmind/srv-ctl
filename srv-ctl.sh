@@ -81,7 +81,7 @@ function deactivate_lvm() {
         lvchange -an "$l_lvm_group/$l_lvm_name"
         echo -e "Done\n"
     else
-        echo -e " already deactivated. Skipping.\n"
+        echo -e "Logic volume \"$l_lvm_name\" already deactivated. Skipping.\n"
     fi
 }
 
