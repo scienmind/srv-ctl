@@ -37,19 +37,27 @@ function verify_lvm() {
     return $FAILURE
 }
 
+function lvm_is_active() {
+    local l_lvm_name=$1
+    local l_lvm_group=$2
+
+    if lvdisplay "$l_lvm_group/$l_lvm_name" | grep 'Status' | grep -v -c 'NOT available' >/dev/null; then
+        return $SUCCESS
+    else
+        return $FAILURE
+    fi
+}
+
 function activate_lvm() {
     local l_lvm_name=$1
     local l_lvm_group=$2
-    local l_lvm_status
 
     if [ "$l_lvm_name" == "none" ] || [ "$l_lvm_group" == "none" ]; then
         return $SUCCESS
     fi
 
     verify_lvm "$l_lvm_name" "$l_lvm_group"
-    l_lvm_status=$(lvdisplay "$l_lvm_group/$l_lvm_name" | grep 'Status' | grep -v -c 'NOT available')
-
-    if [ "$l_lvm_status" -eq "1" ]; then
+    if lvm_is_active "$l_lvm_name" "$l_lvm_group"; then
         echo -e "Logic volume \"$l_lvm_name\" already activated. Skipping.\n"
     else
         echo "Activating $l_lvm_name..."
@@ -61,21 +69,19 @@ function activate_lvm() {
 function deactivate_lvm() {
     local l_lvm_name=$1
     local l_lvm_group=$2
-    local l_lvm_status
 
     if [ "$l_lvm_name" == "none" ] || [ "$l_lvm_group" == "none" ]; then
         return $SUCCESS
     fi
 
     verify_lvm "$l_lvm_name" "$l_lvm_group"
-    l_lvm_status=$(lvdisplay "$l_lvm_group/$l_lvm_name" | grep 'Status' | grep -v -c 'NOT available')
 
-    if [ "$l_lvm_status" -eq "1" ]; then
+    if lvm_is_active "$l_lvm_name" "$l_lvm_group"; then
         echo "Deactivating $l_lvm_name..."
         lvchange -an "$l_lvm_group/$l_lvm_name"
         echo -e "Done\n"
     else
-        echo -e "Logic volume \"$l_lvm_name\" already deactivated. Skipping.\n"
+        echo -e " already deactivated. Skipping.\n"
     fi
 }
 
@@ -253,7 +259,7 @@ function verify_requirements() {
     fi
 
     if [ "$STORAGE_DATA_LVM_NAME" != "none" ] &&
-        command -v lvdisplay &>/dev/null; then
+        ! command -v lvdisplay &>/dev/null; then
         echo "ERROR: 'lvm2' utility is not available"
         return $FAILURE
     fi
