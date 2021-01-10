@@ -5,7 +5,7 @@ readonly SUCCESS=0
 readonly FAILURE=1
 
 function usage() {
-    echo "Usage:   $0  start | stop | unlock-only | stop-services-only | --help | -h"
+    echo "Usage:   $0  < start | stop | unlock-only | stop-services-only | help | -h >"
     return $FAILURE
 }
 
@@ -297,7 +297,7 @@ function main() {
     stop-services-only)
         stop_all_services
         ;;
-    --help)
+    help)
         usage
         ;;
     -h)
