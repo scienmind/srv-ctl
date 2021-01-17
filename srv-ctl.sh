@@ -223,7 +223,7 @@ stop_all_services() {
         stop_service "$ST_SERVICE"
     fi
     if [ "$DOCKER_SERVICE" != "none" ]; then
-        stop_service "$DOCKER_SERVICE"
+        stop_service "$DOCKER_SERVICE" 2>/dev/null
     fi
 }
 
