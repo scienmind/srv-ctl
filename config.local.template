@@ -27,3 +27,5 @@ readonly LUKS_MIN_VERSION="2"
 
 readonly ST_USER="your-syncthing-user"             # set to "none" if not used
 readonly ST_SERVICE="syncthing@${ST_USER}.service" # set to "none" if not used
+
+readonly DOCKER_SERVICE="<docker>.service"         # set to "none" if not used

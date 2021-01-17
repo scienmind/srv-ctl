@@ -203,14 +203,27 @@ function close_all_devices() {
 }
 
 start_all_services() {
+    if [ "$ST_SERVICE" != "none" ] || [ "$DOCKER_SERVICE" != "none" ]; then
+        echo "Reloading systemd units..."
+        systemctl daemon-reload
+        echo -e "Done\n"
+    else
+        echo -e "No services managed. Skipping.\n"
+    fi
     if [ "$ST_SERVICE" != "none" ]; then
         start_service "$ST_SERVICE"
+    fi
+    if [ "$DOCKER_SERVICE" != "none" ]; then
+        start_service "$DOCKER_SERVICE"
     fi
 }
 
 stop_all_services() {
     if [ "$ST_SERVICE" != "none" ]; then
         stop_service "$ST_SERVICE"
+    fi
+    if [ "$DOCKER_SERVICE" != "none" ]; then
+        stop_service "$DOCKER_SERVICE"
     fi
 }
 
