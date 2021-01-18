@@ -157,7 +157,7 @@ function close_device() {
 function stop_service() {
     local l_service=$1
 
-    echo "Stopping service..."
+    echo "Stopping \"$l_service\" service..."
     if systemctl is-active --quiet "$l_service"; then
         systemctl stop "$l_service"
         echo -e "Done\n"
@@ -169,7 +169,7 @@ function stop_service() {
 function start_service() {
     local l_service=$1
 
-    echo "Starting service..."
+    echo "Starting \"$l_service\" service..."
     if systemctl is-active --quiet "$l_service"; then
         echo -e "Service \"$l_service\" active. Skipping.\n"
     else
