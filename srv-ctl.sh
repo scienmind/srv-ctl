@@ -118,6 +118,27 @@ function lock_device() {
     fi
 }
 
+function mount_network_path() {
+    local l_network_path=$1
+    local l_mount_path=$2
+    local l_protocol=$3
+    local l_credentials=$4
+    local l_options=$5
+
+    if [ "$l_protocol" == "none" ]; then
+        return $SUCCESS
+    fi
+
+    if mountpoint -q "/mnt/$l_mount_path"; then
+        echo -e "Mountpoint \"$l_mount_path\" mounted. Skipping.\n"
+    else
+        echo "Mounting $l_mount_path..."
+        mkdir -p "/mnt/$l_mount_path"
+        mount -t "$l_protocol" -o "credentials=$l_credentials,$l_options" "$l_network_path" "/mnt/$l_mount_path"
+        echo -e "Done\n"
+    fi
+}
+
 function mount_device() {
     local l_mapper=$1
     local l_mount=$2
@@ -188,6 +209,10 @@ function open_all_devices() {
     activate_lvm "$STORAGE_DATA_LVM_NAME" "$STORAGE_DATA_LVM_GROUP"
     unlock_device "$STORAGE_DATA_UUID" "$STORAGE_DATA_MAPPER" "$STORAGE_DATA_KEY_FILE"
     mount_device "$STORAGE_DATA_MAPPER" "$STORAGE_DATA_MOUNT"
+
+    # open network storage
+    mount_network_path "$NETWORK_SHARE_ADDRESS" "$NETWORK_SHARE_MOUNT" "$NETWORK_SHARE_PROTOCOL" \
+        "$NETWORK_SHARE_CREDENTIALS" "$NETWORK_SHARE_OPTIONS"
 }
 
 function close_all_devices() {
@@ -200,6 +225,9 @@ function close_all_devices() {
     unmount_device "$ACTIVE_DATA_MOUNT"
     lock_device "$ACTIVE_DATA_MAPPER"
     deactivate_lvm "none" "none"
+
+    # close network storage
+    unmount_device "$NETWORK_SHARE_MOUNT"
 }
 
 start_all_services() {

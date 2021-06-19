@@ -20,6 +20,17 @@ readonly STORAGE_DATA_MAPPER="HDD_EXT"
 readonly STORAGE_DATA_MOUNT="srv_mass_storage"
 
 # -----------------------------------------------------------------------------
+# LAN storage for data at rest
+# -----------------------------------------------------------------------------
+
+readonly NETWORK_SHARE_PROTOCOL="cifs" # set to "none" if network share is not used
+
+readonly NETWORK_SHARE_ADDRESS="//<address>/share_name"
+readonly NETWORK_SHARE_MOUNT="lan_data_storage"
+readonly NETWORK_SHARE_CREDENTIALS="lan_storage_credentials_file_path"
+readonly NETWORK_SHARE_OPTIONS="dir_mode=0555,file_mode=0444"
+
+# -----------------------------------------------------------------------------
 # Misc system definitions
 # -----------------------------------------------------------------------------
 
