@@ -28,7 +28,7 @@ readonly NETWORK_SHARE_PROTOCOL="cifs" # set to "none" if network share is not u
 readonly NETWORK_SHARE_ADDRESS="//<address>/share_name"
 readonly NETWORK_SHARE_MOUNT="lan_data_storage"
 readonly NETWORK_SHARE_CREDENTIALS="lan_storage_credentials_file_path"
-readonly NETWORK_SHARE_OPTIONS="dir_mode=0555,file_mode=0444"
+readonly NETWORK_SHARE_OPTIONS="dir_mode=0555,file_mode=0444,uid=1000,gid=1000"
 
 # -----------------------------------------------------------------------------
 # Misc system definitions
