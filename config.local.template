@@ -1,26 +1,29 @@
 # -----------------------------------------------------------------------------
-# Storage device for active working data
+# Local storage device for active working data (i.e. DBs, logs, etc.)
 # -----------------------------------------------------------------------------
 
-readonly ACTIVE_DATA_UUID="DISK_Y_UUID" # Reported by: `sudo blkid /dev/<device>`
-readonly ACTIVE_DATA_MAPPER="SSD_EXT"
+readonly ACTIVE_DATA_UUID="DISK_X_UUID" # Reported by: `sudo blkid /dev/<device>`
+readonly ACTIVE_DATA_MAPPER="ext_ssd"
 readonly ACTIVE_DATA_MOUNT="srv_rapid_storage"
 
+readonly ACTIVE_DATA_LVM_NAME="logic_volume_name"   # set to "none" if not used
+readonly ACTIVE_DATA_LVM_GROUP="logic_volume_group" # set to "none" if not used
+
 # -----------------------------------------------------------------------------
-# Storage device for data at rest
+# Local storage device for data at rest
 # -----------------------------------------------------------------------------
+
+readonly STORAGE_DATA_KEY_FILE="mass_storage_key_file_path"
+
+readonly STORAGE_DATA_UUID="DISK_Y_UUID" # Reported by: `sudo blkid /dev/<device>`
+readonly STORAGE_DATA_MAPPER="ext_hdd"
+readonly STORAGE_DATA_MOUNT="srv_mass_storage"
 
 readonly STORAGE_DATA_LVM_NAME="logic_volume_name"   # set to "none" if not used
 readonly STORAGE_DATA_LVM_GROUP="logic_volume_group" # set to "none" if not used
 
-readonly STORAGE_DATA_KEY_FILE="mass_storage_key_file_path"
-
-readonly STORAGE_DATA_UUID="DISK_X_UUID" # Reported by: `sudo blkid /dev/<device>`
-readonly STORAGE_DATA_MAPPER="HDD_EXT"
-readonly STORAGE_DATA_MOUNT="srv_mass_storage"
-
 # -----------------------------------------------------------------------------
-# LAN storage for data at rest
+# Network storage for data at rest
 # -----------------------------------------------------------------------------
 
 readonly NETWORK_SHARE_PROTOCOL="cifs" # set to "none" if network share is not used

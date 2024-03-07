@@ -165,14 +165,28 @@ function unmount_device() {
     fi
 }
 
+function open_device() {
+    local l_mount=$1
+    local l_mapper=$2
+    local l_lvm_name=$3
+    local l_lvm_group=$4
+    local l_uuid=$5
+    local l_key_file=$6
+
+    activate_lvm "$l_lvm_name" "$l_lvm_group"
+    unlock_device "$l_uuid" "$l_mapper" "$l_key_file"
+    mount_device "$l_mapper" "$l_mount"
+}
+
 function close_device() {
-    local l_lvm_name=$1
-    local l_lvm_group=$2
-    local l_mapper=$3
-    local l_mount=$4
+    local l_mount=$1
+    local l_mapper=$2
+    local l_lvm_name=$3
+    local l_lvm_group=$4
 
     unmount_device "$l_mount"
     lock_device "$l_mapper"
+    deactivate_lvm "$l_lvm_name" "$l_lvm_group"
 }
 
 function stop_service() {
@@ -201,14 +215,14 @@ function start_service() {
 
 function open_all_devices() {
     # open active data device
-    activate_lvm "none" "none"
-    unlock_device "$ACTIVE_DATA_UUID" "$ACTIVE_DATA_MAPPER" "no_key_file"
-    mount_device "$ACTIVE_DATA_MAPPER" "$ACTIVE_DATA_MOUNT"
+    open_device "$ACTIVE_DATA_MOUNT" "$ACTIVE_DATA_MAPPER" \
+        "$ACTIVE_DATA_LVM_NAME" "$ACTIVE_DATA_LVM_GROUP" \
+        "$ACTIVE_DATA_UUID" "no_key_file"
 
     # open storage data device
-    activate_lvm "$STORAGE_DATA_LVM_NAME" "$STORAGE_DATA_LVM_GROUP"
-    unlock_device "$STORAGE_DATA_UUID" "$STORAGE_DATA_MAPPER" "$STORAGE_DATA_KEY_FILE"
-    mount_device "$STORAGE_DATA_MAPPER" "$STORAGE_DATA_MOUNT"
+    open_device "$STORAGE_DATA_MOUNT" "$STORAGE_DATA_MAPPER" \
+        "$STORAGE_DATA_LVM_NAME" "$STORAGE_DATA_LVM_GROUP" \
+        "$STORAGE_DATA_UUID" "$STORAGE_DATA_KEY_FILE"
 
     # open network storage
     mount_network_path "$NETWORK_SHARE_ADDRESS" "$NETWORK_SHARE_MOUNT" "$NETWORK_SHARE_PROTOCOL" \
@@ -217,20 +231,18 @@ function open_all_devices() {
 
 function close_all_devices() {
     # close storage data device
-    unmount_device "$STORAGE_DATA_MOUNT"
-    lock_device "$STORAGE_DATA_MAPPER"
-    deactivate_lvm "$STORAGE_DATA_LVM_NAME" "$STORAGE_DATA_LVM_GROUP"
+    close_device "$STORAGE_DATA_MOUNT" "$STORAGE_DATA_MAPPER" \
+        "$STORAGE_DATA_LVM_NAME" "$STORAGE_DATA_LVM_GROUP"
 
     # close active data device
-    unmount_device "$ACTIVE_DATA_MOUNT"
-    lock_device "$ACTIVE_DATA_MAPPER"
-    deactivate_lvm "none" "none"
+    close_device "$ACTIVE_DATA_MOUNT" "$ACTIVE_DATA_MAPPER" \
+        "$ACTIVE_DATA_LVM_NAME" "$ACTIVE_DATA_LVM_GROUP"
 
     # close network storage
     unmount_device "$NETWORK_SHARE_MOUNT"
 }
 
-start_all_services() {
+function start_all_services() {
     if [ "$ST_SERVICE" != "none" ] || [ "$DOCKER_SERVICE" != "none" ]; then
         echo "Reloading systemd units..."
         systemctl daemon-reload
@@ -246,7 +258,7 @@ start_all_services() {
     fi
 }
 
-stop_all_services() {
+function stop_all_services() {
     if [ "$ST_SERVICE" != "none" ]; then
         stop_service "$ST_SERVICE"
     fi
@@ -309,7 +321,8 @@ function verify_requirements() {
     local l_cryptsetup_version_major_required="$LUKS_MIN_VERSION"
 
     if [ "$l_cryptsetup_version_major_current" -lt "$l_cryptsetup_version_major_required" ]; then
-        echo "ERROR: Unsupported version of 'cryptsetup' utility, please use version $l_cryptsetup_version_major_required or newer"
+        echo -n "ERROR: Unsupported version of 'cryptsetup' utility,"
+        echo " please use version $l_cryptsetup_version_major_required or newer"
         return $FAILURE
     fi
 }
