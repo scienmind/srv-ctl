@@ -1,3 +1,3 @@
 # srv-ctl
 
-Small utility to manage home server services dependant on encrypted storage.
+Small utility to manage home server services dependent on encrypted storage.
