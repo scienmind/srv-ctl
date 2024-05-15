@@ -2,16 +2,20 @@
 # Local storage device for active working data (i.e. DBs, logs, etc.)
 # -----------------------------------------------------------------------------
 
+# set the value of unused parameters to "none"
+
 readonly ACTIVE_DATA_UUID="DISK_X_UUID" # Reported by: `sudo blkid /dev/<device>`
 readonly ACTIVE_DATA_MAPPER="ext_ssd"
 readonly ACTIVE_DATA_MOUNT="srv_rapid_storage"
 
-readonly ACTIVE_DATA_LVM_NAME="logic_volume_name"   # set to "none" if not used
-readonly ACTIVE_DATA_LVM_GROUP="logic_volume_group" # set to "none" if not used
+readonly ACTIVE_DATA_LVM_NAME="logic_volume_name"
+readonly ACTIVE_DATA_LVM_GROUP="logic_volume_group"
 
 # -----------------------------------------------------------------------------
 # Local storage device for data at rest
 # -----------------------------------------------------------------------------
+
+# set the value of unused parameters to "none"
 
 readonly STORAGE_DATA_KEY_FILE="mass_storage_key_file_path"
 
@@ -19,8 +23,8 @@ readonly STORAGE_DATA_UUID="DISK_Y_UUID" # Reported by: `sudo blkid /dev/<device
 readonly STORAGE_DATA_MAPPER="ext_hdd"
 readonly STORAGE_DATA_MOUNT="srv_mass_storage"
 
-readonly STORAGE_DATA_LVM_NAME="logic_volume_name"   # set to "none" if not used
-readonly STORAGE_DATA_LVM_GROUP="logic_volume_group" # set to "none" if not used
+readonly STORAGE_DATA_LVM_NAME="logic_volume_name"
+readonly STORAGE_DATA_LVM_GROUP="logic_volume_group"
 
 # -----------------------------------------------------------------------------
 # Network storage for data at rest
@@ -39,7 +43,9 @@ readonly NETWORK_SHARE_OPTIONS="dir_mode=0555,file_mode=0444,uid=1000,gid=1000"
 
 readonly LUKS_MIN_VERSION="2"
 
-readonly ST_USER="your-syncthing-user"             # set to "none" if not used
-readonly ST_SERVICE="syncthing@${ST_USER}.service" # set to "none" if not used
+# set the value of unused parameters to "none"
 
-readonly DOCKER_SERVICE="<docker>.service"         # set to "none" if not used
+readonly ST_USER="your-syncthing-user"    
+readonly ST_SERVICE="syncthing@${ST_USER}.service"
+
+readonly DOCKER_SERVICE="<docker>.service"

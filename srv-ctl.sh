@@ -90,7 +90,9 @@ function unlock_device() {
     local l_mapper=$2
     local l_key_file=$3
 
-    if cryptsetup status "$l_mapper" >/dev/null; then
+    if [ "$l_device_uuid" == "none" ] || [ "$l_mapper" == "none" ]; then
+        echo -e "Device not configured (device_uuid=\"$l_device_uuid\"; mapper=\"$l_mapper\"). Skipping.\n"
+    elif cryptsetup status "$l_mapper" >/dev/null; then
         echo -e "Partition \"$l_mapper\" unlocked. Skipping.\n"
     else
         echo "Unlocking $l_mapper..."
@@ -143,7 +145,9 @@ function mount_device() {
     local l_mapper=$1
     local l_mount=$2
 
-    if mountpoint -q "/mnt/$l_mount"; then
+    if [ "$l_mapper" == "none" ] || [ "$l_mount" == "none" ]; then
+        echo -e "Mount not configured (mapper=\"$l_mapper\"; mount_point=\"$l_mount\"). Skipping.\n"
+    elif mountpoint -q "/mnt/$l_mount"; then
         echo -e "Mountpoint \"$l_mount\" mounted. Skipping.\n"
     else
         echo "Mounting $l_mount..."
