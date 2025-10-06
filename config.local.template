@@ -1,51 +1,77 @@
 # -----------------------------------------------------------------------------
-# Local storage device for active working data (i.e. DBs, logs, etc.)
+# Service configuration
 # -----------------------------------------------------------------------------
 
-# set the value of unused parameters to "none"
+# Minimum cryptsetup version required (2.4.0+ supports modern unified syntax)
+readonly CRYPTSETUP_MIN_VERSION="2.4.0"
 
-readonly ACTIVE_DATA_UUID="DISK_X_UUID" # Reported by: `sudo blkid /dev/<device>`
-readonly ACTIVE_DATA_MAPPER="ext_ssd"
-readonly ACTIVE_DATA_MOUNT="srv_rapid_storage"
+# Syncthing users (set to "none" to disable)
+readonly ST_USER_1="none"  # Set to username to enable (e.g., "alice")
+readonly ST_USER_2="none"  # Set to username to enable (e.g., "bob")
 
-readonly ACTIVE_DATA_LVM_NAME="logic_volume_name"
-readonly ACTIVE_DATA_LVM_GROUP="logic_volume_group"
-
-# -----------------------------------------------------------------------------
-# Local storage device for data at rest
-# -----------------------------------------------------------------------------
-
-# set the value of unused parameters to "none"
-
-readonly STORAGE_DATA_KEY_FILE="mass_storage_key_file_path"
-
-readonly STORAGE_DATA_UUID="DISK_Y_UUID" # Reported by: `sudo blkid /dev/<device>`
-readonly STORAGE_DATA_MAPPER="ext_hdd"
-readonly STORAGE_DATA_MOUNT="srv_mass_storage"
-
-readonly STORAGE_DATA_LVM_NAME="logic_volume_name"
-readonly STORAGE_DATA_LVM_GROUP="logic_volume_group"
+# Service names (automatically constructed)
+readonly ST_SERVICE_1="${ST_USER_1:+syncthing@${ST_USER_1}.service}"
+readonly ST_SERVICE_2="${ST_USER_2:+syncthing@${ST_USER_2}.service}"
+readonly DOCKER_SERVICE="none"  # Set to "docker.service" to enable
 
 # -----------------------------------------------------------------------------
-# Network storage for data at rest
+# Primary data device configuration
 # -----------------------------------------------------------------------------
 
-readonly NETWORK_SHARE_PROTOCOL="cifs" # set to "none" if network share is not used
-
-readonly NETWORK_SHARE_ADDRESS="//<address>/share_name"
-readonly NETWORK_SHARE_MOUNT="lan_data_storage"
-readonly NETWORK_SHARE_CREDENTIALS="lan_storage_credentials_file_path"
-readonly NETWORK_SHARE_OPTIONS="dir_mode=0555,file_mode=0444,uid=1000,gid=1000"
+readonly PRIMARY_DATA_MOUNT="primary"  # Mount point under /mnt/
+readonly PRIMARY_DATA_MAPPER="primary-data"  # Device mapper name
+readonly PRIMARY_DATA_LVM_NAME="none"  # Set to LVM volume name to enable LVM
+readonly PRIMARY_DATA_LVM_GROUP="vg-srv"  # LVM group name (used if LVM volume is set)
+readonly PRIMARY_DATA_UUID="none"  # Set to device UUID to enable (find with: sudo blkid)
+readonly PRIMARY_DATA_KEY_FILE="none"  # Set to key file path for automated unlock
+readonly PRIMARY_DATA_ENCRYPTION_TYPE="luks"  # Options: "luks" or "bitlocker"
 
 # -----------------------------------------------------------------------------
-# Misc system definitions
+# Storage devices for Syncthing service 1
 # -----------------------------------------------------------------------------
 
-readonly LUKS_MIN_VERSION="2"
+readonly STORAGE_1A_MOUNT="storage1a"  # Mount point under /mnt/
+readonly STORAGE_1A_MAPPER="storage1a-data"  # Device mapper name
+readonly STORAGE_1A_LVM_NAME="none"  # Set to LVM volume name to enable LVM
+readonly STORAGE_1A_LVM_GROUP="vg-srv"  # LVM group name (used if LVM volume is set)
+readonly STORAGE_1A_UUID="none"  # Set to device UUID to enable (find with: sudo blkid)
+readonly STORAGE_1A_KEY_FILE="none"  # Set to key file path for automated unlock
+readonly STORAGE_1A_ENCRYPTION_TYPE="luks"  # Options: "luks" or "bitlocker"
 
-# set the value of unused parameters to "none"
+readonly STORAGE_1B_MOUNT="storage1b"  # Mount point under /mnt/
+readonly STORAGE_1B_MAPPER="storage1b-data"  # Device mapper name
+readonly STORAGE_1B_LVM_NAME="none"  # Set to LVM volume name to enable LVM
+readonly STORAGE_1B_LVM_GROUP="vg-srv"  # LVM group name (used if LVM volume is set)
+readonly STORAGE_1B_UUID="none"  # Set to device UUID to enable (find with: sudo blkid)
+readonly STORAGE_1B_KEY_FILE="none"  # Set to key file path for automated unlock
+readonly STORAGE_1B_ENCRYPTION_TYPE="luks"  # Options: "luks" or "bitlocker"
 
-readonly ST_USER="your-syncthing-user"    
-readonly ST_SERVICE="syncthing@${ST_USER}.service"
+# -----------------------------------------------------------------------------
+# Storage devices for Syncthing service 2
+# -----------------------------------------------------------------------------
 
-readonly DOCKER_SERVICE="<docker>.service"
+readonly STORAGE_2A_MOUNT="storage2a"  # Mount point under /mnt/
+readonly STORAGE_2A_MAPPER="storage2a-data"  # Device mapper name
+readonly STORAGE_2A_LVM_NAME="none"  # Set to LVM volume name to enable LVM
+readonly STORAGE_2A_LVM_GROUP="vg-srv"  # LVM group name (used if LVM volume is set)
+readonly STORAGE_2A_UUID="none"  # Set to device UUID to enable (find with: sudo blkid)
+readonly STORAGE_2A_KEY_FILE="none"  # Set to key file path for automated unlock
+readonly STORAGE_2A_ENCRYPTION_TYPE="luks"  # Options: "luks" or "bitlocker"
+
+readonly STORAGE_2B_MOUNT="storage2b"  # Mount point under /mnt/
+readonly STORAGE_2B_MAPPER="storage2b-data"  # Device mapper name
+readonly STORAGE_2B_LVM_NAME="none"  # Set to LVM volume name to enable LVM
+readonly STORAGE_2B_LVM_GROUP="vg-srv"  # LVM group name (used if LVM volume is set)
+readonly STORAGE_2B_UUID="none"  # Set to device UUID to enable (find with: sudo blkid)
+readonly STORAGE_2B_KEY_FILE="none"  # Set to key file path for automated unlock
+readonly STORAGE_2B_ENCRYPTION_TYPE="luks"  # Options: "luks" or "bitlocker"
+
+# -----------------------------------------------------------------------------
+# Network share configuration
+# -----------------------------------------------------------------------------
+
+readonly NETWORK_SHARE_ADDRESS="none"  # Set to share path to enable (e.g., "//server/share")
+readonly NETWORK_SHARE_MOUNT="none"  # Set to mount name (e.g., "network")
+readonly NETWORK_SHARE_PROTOCOL="none"  # Set to protocol: "cifs", "nfs", etc.
+readonly NETWORK_SHARE_CREDENTIALS="none"  # Set to credentials file path
+readonly NETWORK_SHARE_OPTIONS="uid=1000,gid=1000,iocharset=utf8"  # Mount options
