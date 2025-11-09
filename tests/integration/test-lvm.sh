@@ -1,0 +1,173 @@
+#!/bin/bash
+# Integration tests for LVM operations
+
+set -euo pipefail
+
+# Load test environment
+if [[ ! -f /tmp/test_env.conf ]]; then
+    echo "ERROR: Test environment not setup. Run setup-test-env.sh first."
+    exit 1
+fi
+source /tmp/test_env.conf
+
+# Load libraries
+export SUCCESS=0
+export FAILURE=1
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../../lib/os-utils.sh"
+source "$SCRIPT_DIR/../../lib/storage.sh"
+
+# Test counters
+TESTS_RUN=0
+TESTS_PASSED=0
+TESTS_FAILED=0
+
+# Colors
+readonly RED='\033[0;31m'
+readonly GREEN='\033[0;32m'
+readonly YELLOW='\033[1;33m'
+readonly NC='\033[0m'
+
+log_test() {
+    echo -e "${YELLOW}[TEST]${NC} $*"
+}
+
+log_pass() {
+    echo -e "${GREEN}[PASS]${NC} $*"
+    ((TESTS_PASSED++))
+}
+
+log_fail() {
+    echo -e "${RED}[FAIL]${NC} $*"
+    ((TESTS_FAILED++))
+}
+
+run_test() {
+    ((TESTS_RUN++))
+    log_test "$1"
+}
+
+# Test 1: Verify LVM
+test_lvm_verify() {
+    run_test "LVM verification"
+    
+    if verify_lvm "$TEST_VG_NAME" "$TEST_LV_NAME"; then
+        log_pass "LVM verification successful"
+    else
+        log_fail "LVM verification failed"
+        return 1
+    fi
+}
+
+# Test 2: Check if LVM is active
+test_lvm_is_active() {
+    run_test "LVM active check"
+    
+    if lvm_is_active "$TEST_VG_NAME" "$TEST_LV_NAME"; then
+        log_pass "LVM is active"
+    else
+        log_fail "LVM is not active"
+        return 1
+    fi
+}
+
+# Test 3: Deactivate and reactivate LVM
+test_lvm_deactivate_activate() {
+    run_test "LVM deactivate and reactivate"
+    
+    # Deactivate
+    if deactivate_lvm "$TEST_VG_NAME" "$TEST_LV_NAME"; then
+        log_pass "Successfully deactivated LVM"
+    else
+        log_fail "Failed to deactivate LVM"
+        return 1
+    fi
+    
+    # Verify it's inactive
+    if ! lvm_is_active "$TEST_VG_NAME" "$TEST_LV_NAME"; then
+        log_pass "LVM is inactive"
+    else
+        log_fail "LVM is still active after deactivation"
+        return 1
+    fi
+    
+    # Reactivate
+    if activate_lvm "$TEST_VG_NAME" "$TEST_LV_NAME"; then
+        log_pass "Successfully reactivated LVM"
+    else
+        log_fail "Failed to reactivate LVM"
+        return 1
+    fi
+    
+    # Verify it's active
+    if lvm_is_active "$TEST_VG_NAME" "$TEST_LV_NAME"; then
+        log_pass "LVM is active after reactivation"
+    else
+        log_fail "LVM is not active after reactivation"
+        return 1
+    fi
+}
+
+# Test 4: Double deactivation handling
+test_lvm_double_deactivate() {
+    run_test "LVM double deactivation handling"
+    
+    # Deactivate once
+    deactivate_lvm "$TEST_VG_NAME" "$TEST_LV_NAME" &>/dev/null
+    
+    # Try to deactivate again
+    if deactivate_lvm "$TEST_VG_NAME" "$TEST_LV_NAME" 2>/dev/null; then
+        log_pass "Double deactivation handled gracefully"
+    else
+        log_fail "Double deactivation returned error"
+        return 1
+    fi
+    
+    # Reactivate for subsequent tests
+    activate_lvm "$TEST_VG_NAME" "$TEST_LV_NAME" &>/dev/null
+}
+
+# Test 5: Verify nonexistent VG/LV
+test_lvm_verify_nonexistent() {
+    run_test "LVM verify nonexistent volume"
+    
+    if verify_lvm "nonexistent_vg" "nonexistent_lv" 2>/dev/null; then
+        log_fail "verify_lvm succeeded for nonexistent volume (should fail)"
+        return 1
+    else
+        log_pass "verify_lvm correctly failed for nonexistent volume"
+    fi
+}
+
+# Run all tests
+main() {
+    echo "========================================="
+    echo "LVM Integration Tests"
+    echo "========================================="
+    echo ""
+    
+    test_lvm_verify
+    test_lvm_is_active
+    test_lvm_deactivate_activate
+    test_lvm_double_deactivate
+    test_lvm_verify_nonexistent
+    
+    echo ""
+    echo "========================================="
+    echo "Test Results"
+    echo "========================================="
+    echo "Tests run:    $TESTS_RUN"
+    echo "Tests passed: $TESTS_PASSED"
+    echo "Tests failed: $TESTS_FAILED"
+    echo ""
+    
+    if [[ $TESTS_FAILED -eq 0 ]]; then
+        echo -e "${GREEN}All tests passed!${NC}"
+        exit 0
+    else
+        echo -e "${RED}Some tests failed!${NC}"
+        exit 1
+    fi
+}
+
+main "$@"

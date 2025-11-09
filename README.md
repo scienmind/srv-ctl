@@ -15,7 +15,9 @@ Small utility to manage home server services dependent on encrypted storage.
 
 - **cryptsetup**: Version 2.4.0+ (supports both LUKS and BitLocker encryption)
 - **lvm2**: Required only if using LVM volumes
-- **Root privileges**: Script must be run as root
+- **GNU coreutils**: Required for version comparison (`sort -V`)
+- **systemd**: Required for service management
+- **Root privileges**: Script must be run as root for start/stop/unlock operations
 
 ## Configuration
 
@@ -65,9 +67,11 @@ sudo ./srv-ctl.sh start               # Start all services and mount devices
 sudo ./srv-ctl.sh stop                # Stop all services and unmount devices
 sudo ./srv-ctl.sh unlock-only         # Only unlock and mount devices
 sudo ./srv-ctl.sh stop-services-only  # Only stop services
-./srv-ctl.sh validate-config          # Validate configuration without making changes
+./srv-ctl.sh validate-config          # Validate configuration (no root required)
 ./srv-ctl.sh help                     # Show help message
 ```
+
+**Note**: The `validate-config` command does not require root privileges unless key files have restricted permissions.
 
 ## Migration from Old Format
 
