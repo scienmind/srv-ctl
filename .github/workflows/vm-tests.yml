@@ -1,0 +1,97 @@
+name: VM Integration Tests
+
+on:
+  push:
+    branches: [ main, develop, v2-refactor ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:  # Manual trigger
+  schedule:
+    - cron: '0 2 * * 0'  # Weekly on Sunday at 2 AM
+
+jobs:
+  # Fast Docker tests run first (gate for VM tests)
+  docker-tests:
+    name: Docker Tests (Quick Gate)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run Docker Tests
+        run: ./tests/docker/run-docker-tests.sh
+        
+  # Full VM tests with multiple OS versions (run in parallel)
+  vm-tests:
+    name: VM Tests - ${{ matrix.os }}
+    needs: docker-tests  # Only run if Docker tests pass
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false  # Continue testing other OSes even if one fails
+      matrix:
+        os:
+          - ubuntu-22.04
+          - ubuntu-24.04
+          - debian-11
+          - debian-12
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        
+      - name: Install VM dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-system-x86 qemu-utils cloud-image-utils
+      
+      - name: Cache VM images
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/vm-images
+          key: vm-images-${{ matrix.os }}-${{ hashFiles('tests/vm/Vagrantfile') }}
+          
+      - name: Download cloud image
+        run: |
+          mkdir -p ~/.cache/vm-images
+          ./tests/vm/download-image.sh ${{ matrix.os }}
+      
+      - name: Run VM tests
+        timeout-minutes: 15
+        run: |
+          ./tests/vm/run-vm-tests.sh ${{ matrix.os }}
+      
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: vm-test-results-${{ matrix.os }}
+          path: tests/vm/results/
+          
+      - name: Cleanup
+        if: always()
+        run: ./tests/vm/cleanup.sh
+        
+  # Summary job
+  test-summary:
+    name: Test Summary
+    needs: [docker-tests, vm-tests]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check test results
+        run: |
+          echo "Docker Tests: ${{ needs.docker-tests.result }}"
+          echo "VM Tests: ${{ needs.vm-tests.result }}"
+          
+          if [ "${{ needs.docker-tests.result }}" != "success" ]; then
+            echo "❌ Docker tests failed"
+            exit 1
+          fi
+          
+          if [ "${{ needs.vm-tests.result }}" != "success" ]; then
+            echo "⚠️ Some VM tests failed (check matrix)"
+            exit 1
+          fi
+          
+          echo "✅ All tests passed!"

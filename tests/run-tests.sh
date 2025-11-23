@@ -117,14 +117,38 @@ run_unit_tests() {
     fi
 }
 
-# Phase 3: Integration Tests
+# Phase 3: End-to-End Tests
+run_e2e_tests() {
+    log_phase "PHASE 3: End-to-End Tests"
+    
+    local test_file="$SCRIPT_DIR/e2e/test-e2e.sh"
+    
+    if [[ ! -f "$test_file" ]]; then
+        log_error "E2E test file not found: $test_file"
+        PHASE_FAILED+=("Phase 3: E2E Tests (file not found)")
+        return 1
+    fi
+    
+    log_info "Running: $(basename "$test_file")"
+    if "$test_file"; then
+        log_success "✓ E2E tests passed"
+        PHASE_PASSED+=("Phase 3: End-to-End Tests")
+        return 0
+    else
+        log_error "✗ E2E tests failed"
+        PHASE_FAILED+=("Phase 3: End-to-End Tests")
+        return 1
+    fi
+}
+
+# Phase 4: Integration Tests
 run_integration_tests() {
-    log_phase "PHASE 3: Integration Tests (requires root)"
+    log_phase "PHASE 4: Integration Tests (requires root)"
     
     if [[ $EUID -ne 0 ]]; then
         log_error "Integration tests require root privileges"
         log_info "Run with: sudo $0 --integration"
-        PHASE_FAILED+=("Phase 3: Integration Tests (root required)")
+        PHASE_FAILED+=("Phase 4: Integration Tests (root required)")
         return 1
     fi
     
@@ -132,7 +156,7 @@ run_integration_tests() {
     log_info "Setting up test environment..."
     if ! "$SCRIPT_DIR/fixtures/setup-test-env.sh"; then
         log_error "Failed to setup test environment"
-        PHASE_FAILED+=("Phase 3: Integration Tests (setup failed)")
+        PHASE_FAILED+=("Phase 4: Integration Tests (setup failed)")
         return 1
     fi
     
@@ -159,10 +183,10 @@ run_integration_tests() {
     "$SCRIPT_DIR/fixtures/cleanup-test-env.sh"
     
     if [[ $failed -eq 0 ]]; then
-        PHASE_PASSED+=("Phase 3: Integration Tests")
+        PHASE_PASSED+=("Phase 4: Integration Tests")
         return 0
     else
-        PHASE_FAILED+=("Phase 3: Integration Tests")
+        PHASE_FAILED+=("Phase 4: Integration Tests")
         return 1
     fi
 }
@@ -200,6 +224,7 @@ print_summary() {
 main() {
     local run_syntax=true
     local run_unit=true
+    local run_e2e=true
     local run_integration=false
     
     # Parse arguments
@@ -207,17 +232,26 @@ main() {
         case $1 in
             --syntax-only)
                 run_unit=false
+                run_e2e=false
                 run_integration=false
                 shift
                 ;;
             --unit-only)
                 run_syntax=false
+                run_e2e=false
+                run_integration=false
+                shift
+                ;;
+            --e2e-only)
+                run_syntax=false
+                run_unit=false
                 run_integration=false
                 shift
                 ;;
             --integration-only)
                 run_syntax=false
                 run_unit=false
+                run_e2e=false
                 run_integration=true
                 shift
                 ;;
@@ -231,11 +265,12 @@ main() {
                 echo "Options:"
                 echo "  --syntax-only         Run only syntax and lint checks"
                 echo "  --unit-only           Run only unit tests"
+                echo "  --e2e-only            Run only end-to-end tests"
                 echo "  --integration-only    Run only integration tests (requires root)"
                 echo "  --integration, --all  Run all tests including integration (requires root)"
                 echo "  --help                Show this help message"
                 echo ""
-                echo "Default: Run syntax checks and unit tests (no root required)"
+                echo "Default: Run syntax checks, unit tests, and e2e tests (no root required)"
                 exit 0
                 ;;
             *)
@@ -253,6 +288,10 @@ main() {
     
     if $run_unit; then
         run_unit_tests || true
+    fi
+    
+    if $run_e2e; then
+        run_e2e_tests || true
     fi
     
     if $run_integration; then

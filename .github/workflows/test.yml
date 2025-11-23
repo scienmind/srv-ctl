@@ -28,6 +28,11 @@ jobs:
           echo "Checking lib/storage.sh..."
           bash -n lib/storage.sh
       
+      - name: Prepare test config
+        run: |
+          # Use test config for validation
+          cp tests/fixtures/config.local.test config.local
+      
       - name: Run ShellCheck
         run: |
           echo "ShellCheck srv-ctl.sh..."

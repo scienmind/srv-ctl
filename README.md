@@ -91,3 +91,37 @@ If you have an existing `config.local` from an earlier version, you'll need to u
    - Enhanced validation and error handling
 
 Use `./srv-ctl.sh validate-config` to check your configuration after updating.
+
+## Development & Testing
+
+The project includes comprehensive tests with Docker and VM-based testing:
+
+```bash
+# Run local tests (no root required)
+./tests/run-tests.sh
+
+# Run tests in Docker (isolated, safe)
+./tests/docker/run-docker-tests.sh
+
+# Run full VM tests (CI only, multi-OS)
+./tests/vm/run-vm-tests.sh ubuntu-22.04
+```
+
+See [`tests/README.md`](tests/README.md) for detailed testing documentation.
+
+## Project Structure
+
+```
+srv-ctl/
+├── srv-ctl.sh              # Main script
+├── lib/
+│   ├── os-utils.sh        # OS-level utilities
+│   └── storage.sh         # Storage operations
+├── config.local.template   # Configuration template
+└── tests/                  # Test suite
+```
+
+## License
+
+See repository for license information.
+
