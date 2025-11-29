@@ -83,6 +83,15 @@ close_luks() {
 detach_loop_devices() {
     log_info "Detaching loop devices..."
     
+    # Remove UUID symlinks for loop devices
+    if [[ -f /tmp/test_env.conf ]]; then
+        source /tmp/test_env.conf 2>/dev/null || true
+        if [[ -n "${TEST_LOOP_UUID:-}" && -L "/dev/disk/by-uuid/$TEST_LOOP_UUID" ]]; then
+            log_info "Removing UUID symlink /dev/disk/by-uuid/$TEST_LOOP_UUID..."
+            rm -f "/dev/disk/by-uuid/$TEST_LOOP_UUID"
+        fi
+    fi
+    
     # Find and detach all loop devices using our test file
     for loop_dev in $(losetup -j /tmp/test_loop.img 2>/dev/null | cut -d: -f1); do
         log_info "Detaching $loop_dev..."

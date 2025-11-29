@@ -93,6 +93,9 @@ create_luks_container() {
     # Format as LUKS
     echo -n "$TEST_PASSWORD" | cryptsetup luksFormat --type luks2 "$loop_dev" -
     
+    # Trigger udev to create symlinks
+    udevadm settle
+    
     # Open the LUKS container
     echo -n "$TEST_PASSWORD" | cryptsetup open "$loop_dev" "$TEST_LUKS_NAME" -
     
@@ -114,8 +117,14 @@ create_lvm_on_luks() {
     # Create logical volume (use most of the space)
     lvcreate -L 90M -n "$TEST_LV_NAME" "$TEST_VG_NAME"
     
+    # Trigger udev to create symlinks
+    udevadm settle
+    
     # Format with ext4
     mkfs.ext4 -q "/dev/$TEST_VG_NAME/$TEST_LV_NAME"
+    
+    # Trigger udev again after formatting
+    udevadm settle
     
     log_info "LVM created: /dev/$TEST_VG_NAME/$TEST_LV_NAME"
 }
@@ -134,10 +143,23 @@ export_test_config() {
     # Get UUID of the loop device (for unlock_device function)
     local loop_uuid
     loop_uuid=$(blkid -s UUID -o value "$loop_dev")
+    if [ -z "$loop_uuid" ]; then
+        log_error "Failed to get UUID for loop device $loop_dev"
+        return "$FAILURE"
+    fi
+    
+    # Create /dev/disk/by-uuid symlink manually for loop device (udev doesn't do this)
+    mkdir -p /dev/disk/by-uuid
+    ln -sf "$loop_dev" "/dev/disk/by-uuid/$loop_uuid"
+    log_info "Created UUID symlink: /dev/disk/by-uuid/$loop_uuid -> $loop_dev"
     
     # Get UUID of the LVM logical volume (for mount tests)
     local lv_uuid
     lv_uuid=$(blkid -s UUID -o value "/dev/$TEST_VG_NAME/$TEST_LV_NAME")
+    if [ -z "$lv_uuid" ]; then
+        log_error "Failed to get UUID for LV /dev/$TEST_VG_NAME/$TEST_LV_NAME"
+        return "$FAILURE"
+    fi
     
     cat > "$config_file" <<EOF
 # Test environment configuration
