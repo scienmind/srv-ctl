@@ -32,7 +32,7 @@ function get_uid_from_username() {
     
     if [ "$l_username" == "none" ]; then
         echo ""
-        return $SUCCESS
+        return "$SUCCESS"
     fi
     
     local l_uid
@@ -40,11 +40,11 @@ function get_uid_from_username() {
     
     if [ -z "$l_uid" ]; then
         echo "ERROR: User \"$l_username\" not found"
-        return $FAILURE
+        return "$FAILURE"
     fi
     
     echo "$l_uid"
-    return $SUCCESS
+    return "$SUCCESS"
 }
 
 function get_gid_from_groupname() {
@@ -52,7 +52,7 @@ function get_gid_from_groupname() {
     
     if [ "$l_groupname" == "none" ]; then
         echo ""
-        return $SUCCESS
+        return "$SUCCESS"
     fi
     
     local l_gid
@@ -60,11 +60,11 @@ function get_gid_from_groupname() {
     
     if [ -z "$l_gid" ]; then
         echo "ERROR: Group \"$l_groupname\" not found"
-        return $FAILURE
+        return "$FAILURE"
     fi
     
     echo "$l_gid"
-    return $SUCCESS
+    return "$SUCCESS"
 }
 
 function build_mount_options() {
@@ -79,9 +79,9 @@ function build_mount_options() {
     # Get UID from username
     if [ "$l_owner_user" != "none" ]; then
         l_uid=$(get_uid_from_username "$l_owner_user")
-        if [ $? -ne $SUCCESS ]; then
+        if [ $? -ne "$SUCCESS" ]; then
             echo "$l_uid"  # Print error message
-            return $FAILURE
+            return "$FAILURE"
         fi
         l_final_options="uid=$l_uid"
     fi
@@ -89,9 +89,9 @@ function build_mount_options() {
     # Get GID from groupname
     if [ "$l_owner_group" != "none" ]; then
         l_gid=$(get_gid_from_groupname "$l_owner_group")
-        if [ $? -ne $SUCCESS ]; then
+        if [ $? -ne "$SUCCESS" ]; then
             echo "$l_gid"  # Print error message
-            return $FAILURE
+            return "$FAILURE"
         fi
         
         if [ -n "$l_final_options" ]; then
@@ -116,7 +116,7 @@ function build_mount_options() {
     fi
     
     echo "$l_final_options"
-    return $SUCCESS
+    return "$SUCCESS"
 }
 
 # -----------------------------------------------------------------------------
@@ -127,14 +127,14 @@ function stop_service() {
     local l_service=$1
 
     if [ "$l_service" == "none" ]; then
-        return $SUCCESS
+        return "$SUCCESS"
     fi
 
     echo "Stopping \"$l_service\" service..."
     if systemctl is-active --quiet "$l_service"; then
         if ! systemctl stop "$l_service"; then
             echo "WARNING: Failed to stop service \"$l_service\""
-            return $FAILURE
+            return "$FAILURE"
         fi
         echo -e "Done\n"
     else
@@ -146,16 +146,16 @@ function start_service() {
     local l_service=$1
 
     if [ "$l_service" == "none" ]; then
-        return $SUCCESS
+        return "$SUCCESS"
     fi
 
     echo "Starting \"$l_service\" service..."
     if systemctl is-active --quiet "$l_service"; then
-        echo -e "Service \"$l_service\" active. Skipping.\n"
+        echo -e "Service \"$l_service\" active. Skipping.\\n"
     else
         if ! systemctl start "$l_service"; then
             echo "ERROR: Failed to start service \"$l_service\""
-            return $FAILURE
+            return "$FAILURE"
         fi
         echo -e "Done\n"
     fi
