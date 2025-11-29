@@ -42,7 +42,8 @@ readonly FAILURE=1
 # -----------------------------------------------------------------------------
 
 # Get the directory where this script resides
-readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_DIR
 
 # Source library functions
 # shellcheck disable=SC1091  # Library files exist
