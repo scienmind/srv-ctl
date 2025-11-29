@@ -51,9 +51,9 @@ setup() {
 
 # Test build_mount_options()
 @test "build_mount_options creates correct options for root user" {
-    run build_mount_options "root" "root"
+    run build_mount_options "root" "root" "defaults"
     [ "$status" -eq 0 ]
-    [ "$output" = "uid=0,gid=0,umask=0022" ]
+    [ "$output" = "uid=0,gid=0" ]
 }
 
 @test "build_mount_options returns error for invalid username" {
