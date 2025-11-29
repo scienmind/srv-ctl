@@ -128,7 +128,16 @@ create_mount_point() {
 
 # Export test configuration
 export_test_config() {
+    local loop_dev=$1
     local config_file="/tmp/test_env.conf"
+    
+    # Get UUID of the loop device (for unlock_device function)
+    local loop_uuid
+    loop_uuid=$(blkid -s UUID -o value "$loop_dev")
+    
+    # Get UUID of the LVM logical volume (for mount tests)
+    local lv_uuid
+    lv_uuid=$(blkid -s UUID -o value "/dev/$TEST_VG_NAME/$TEST_LV_NAME")
     
     cat > "$config_file" <<EOF
 # Test environment configuration
@@ -139,9 +148,15 @@ export TEST_MOUNT_POINT="$TEST_MOUNT_POINT"
 export TEST_PASSWORD="$TEST_PASSWORD"
 export TEST_LUKS_DEV="/dev/mapper/$TEST_LUKS_NAME"
 export TEST_LV_DEV="/dev/$TEST_VG_NAME/$TEST_LV_NAME"
+export TEST_LOOP_UUID="$loop_uuid"
+export TEST_LV_UUID="$lv_uuid"
+export TEST_LUKS_MAPPER="$TEST_LUKS_NAME"
+export TEST_LV_MAPPER="$TEST_VG_NAME-$TEST_LV_NAME"
 EOF
     
     log_info "Test configuration exported to $config_file"
+    log_info "  Loop device UUID: $loop_uuid"
+    log_info "  LV UUID: $lv_uuid"
     log_info "Source with: source $config_file"
 }
 
@@ -152,11 +167,12 @@ main() {
     check_privileges
     install_dependencies
     
-    local loop_dev=$(create_loop_device)
+    local loop_dev
+    loop_dev=$(create_loop_device)
     create_luks_container "$loop_dev"
     create_lvm_on_luks
     create_mount_point
-    export_test_config
+    export_test_config "$loop_dev"
     
     log_info "Test environment setup complete!"
     log_info ""

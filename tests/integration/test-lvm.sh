@@ -51,7 +51,7 @@ run_test() {
 test_lvm_verify() {
     run_test "LVM verification"
     
-    if verify_lvm "$TEST_VG_NAME" "$TEST_LV_NAME"; then
+    if verify_lvm "$TEST_LV_NAME" "$TEST_VG_NAME"; then
         log_pass "LVM verification successful"
     else
         log_fail "LVM verification failed"
@@ -63,7 +63,7 @@ test_lvm_verify() {
 test_lvm_is_active() {
     run_test "LVM active check"
     
-    if lvm_is_active "$TEST_VG_NAME" "$TEST_LV_NAME"; then
+    if lvm_is_active "$TEST_LV_NAME" "$TEST_VG_NAME"; then
         log_pass "LVM is active"
     else
         log_fail "LVM is not active"
@@ -76,7 +76,7 @@ test_lvm_deactivate_activate() {
     run_test "LVM deactivate and reactivate"
     
     # Deactivate
-    if deactivate_lvm "$TEST_VG_NAME" "$TEST_LV_NAME"; then
+    if deactivate_lvm "$TEST_LV_NAME" "$TEST_VG_NAME"; then
         log_pass "Successfully deactivated LVM"
     else
         log_fail "Failed to deactivate LVM"
@@ -84,7 +84,7 @@ test_lvm_deactivate_activate() {
     fi
     
     # Verify it's inactive
-    if ! lvm_is_active "$TEST_VG_NAME" "$TEST_LV_NAME"; then
+    if ! lvm_is_active "$TEST_LV_NAME" "$TEST_VG_NAME"; then
         log_pass "LVM is inactive"
     else
         log_fail "LVM is still active after deactivation"
@@ -92,7 +92,7 @@ test_lvm_deactivate_activate() {
     fi
     
     # Reactivate
-    if activate_lvm "$TEST_VG_NAME" "$TEST_LV_NAME"; then
+    if activate_lvm "$TEST_LV_NAME" "$TEST_VG_NAME"; then
         log_pass "Successfully reactivated LVM"
     else
         log_fail "Failed to reactivate LVM"
@@ -100,7 +100,7 @@ test_lvm_deactivate_activate() {
     fi
     
     # Verify it's active
-    if lvm_is_active "$TEST_VG_NAME" "$TEST_LV_NAME"; then
+    if lvm_is_active "$TEST_LV_NAME" "$TEST_VG_NAME"; then
         log_pass "LVM is active after reactivation"
     else
         log_fail "LVM is not active after reactivation"
@@ -113,10 +113,10 @@ test_lvm_double_deactivate() {
     run_test "LVM double deactivation handling"
     
     # Deactivate once
-    deactivate_lvm "$TEST_VG_NAME" "$TEST_LV_NAME" &>/dev/null
+    deactivate_lvm "$TEST_LV_NAME" "$TEST_VG_NAME" &>/dev/null
     
     # Try to deactivate again
-    if deactivate_lvm "$TEST_VG_NAME" "$TEST_LV_NAME" 2>/dev/null; then
+    if deactivate_lvm "$TEST_LV_NAME" "$TEST_VG_NAME" 2>/dev/null; then
         log_pass "Double deactivation handled gracefully"
     else
         log_fail "Double deactivation returned error"
@@ -124,14 +124,14 @@ test_lvm_double_deactivate() {
     fi
     
     # Reactivate for subsequent tests
-    activate_lvm "$TEST_VG_NAME" "$TEST_LV_NAME" &>/dev/null
+    activate_lvm "$TEST_LV_NAME" "$TEST_VG_NAME" &>/dev/null
 }
 
 # Test 5: Verify nonexistent VG/LV
 test_lvm_verify_nonexistent() {
     run_test "LVM verify nonexistent volume"
     
-    if verify_lvm "nonexistent_vg" "nonexistent_lv" 2>/dev/null; then
+    if verify_lvm "nonexistent_lv" "nonexistent_vg" 2>/dev/null; then
         log_fail "verify_lvm succeeded for nonexistent volume (should fail)"
         return 1
     else

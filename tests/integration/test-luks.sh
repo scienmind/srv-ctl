@@ -51,11 +51,7 @@ run_test() {
 test_luks_lock_unlock() {
     run_test "LUKS lock and unlock"
     
-    # Get loop device for LUKS container
-    local loop_dev=$(losetup -j /tmp/test_loop.img | cut -d: -f1)
-    
-    # Close LUKS
-    if lock_device "$TEST_LUKS_NAME"; then
+    if lock_device "$TEST_LUKS_MAPPER" "luks"; then
         log_pass "Successfully closed LUKS container"
     else
         log_fail "Failed to close LUKS container"
@@ -63,15 +59,15 @@ test_luks_lock_unlock() {
     fi
     
     # Verify it's closed
-    if [[ ! -e "/dev/mapper/$TEST_LUKS_NAME" ]]; then
+    if [[ ! -e "/dev/mapper/$TEST_LUKS_MAPPER" ]]; then
         log_pass "LUKS container is closed"
     else
         log_fail "LUKS container still exists after close"
         return 1
     fi
     
-    # Reopen LUKS
-    if echo -n "$TEST_PASSWORD" | unlock_device "$loop_dev" "$TEST_LUKS_NAME" "luks"; then
+    # Reopen LUKS using UUID
+    if echo -n "$TEST_PASSWORD" | unlock_device "$TEST_LOOP_UUID" "$TEST_LUKS_MAPPER" "none" "luks"; then
         log_pass "Successfully reopened LUKS container"
     else
         log_fail "Failed to reopen LUKS container"
@@ -79,7 +75,7 @@ test_luks_lock_unlock() {
     fi
     
     # Verify it's open
-    if [[ -e "/dev/mapper/$TEST_LUKS_NAME" ]]; then
+    if [[ -e "/dev/mapper/$TEST_LUKS_MAPPER" ]]; then
         log_pass "LUKS container is open"
     else
         log_fail "LUKS container does not exist after open"
@@ -91,13 +87,11 @@ test_luks_lock_unlock() {
 test_luks_wrong_password() {
     run_test "LUKS wrong password handling"
     
-    local loop_dev=$(losetup -j /tmp/test_loop.img | cut -d: -f1)
-    
     # Close first
-    lock_device "$TEST_LUKS_NAME" &>/dev/null
+    lock_device "$TEST_LUKS_MAPPER" "luks" &>/dev/null
     
     # Try to open with wrong password
-    if echo -n "wrongpassword" | unlock_device "$loop_dev" "$TEST_LUKS_NAME" "luks" 2>/dev/null; then
+    if echo -n "wrongpassword" | unlock_device "$TEST_LOOP_UUID" "$TEST_LUKS_MAPPER" "none" "luks" 2>/dev/null; then
         log_fail "LUKS opened with wrong password (should have failed)"
         return 1
     else
@@ -105,7 +99,7 @@ test_luks_wrong_password() {
     fi
     
     # Reopen with correct password for subsequent tests
-    echo -n "$TEST_PASSWORD" | unlock_device "$loop_dev" "$TEST_LUKS_NAME" "luks" &>/dev/null
+    echo -n "$TEST_PASSWORD" | unlock_device "$TEST_LOOP_UUID" "$TEST_LUKS_MAPPER" "none" "luks" &>/dev/null
 }
 
 # Test 3: Double close handling
@@ -113,10 +107,10 @@ test_luks_double_close() {
     run_test "LUKS double close handling"
     
     # Close once
-    lock_device "$TEST_LUKS_NAME" &>/dev/null
+    lock_device "$TEST_LUKS_MAPPER" "luks" &>/dev/null
     
-    # Try to close again
-    if lock_device "$TEST_LUKS_NAME" 2>/dev/null; then
+    # Try to close again (library should skip if already closed)
+    if lock_device "$TEST_LUKS_MAPPER" "luks" 2>/dev/null; then
         log_pass "Double close handled gracefully"
     else
         log_fail "Double close returned error"
@@ -124,8 +118,7 @@ test_luks_double_close() {
     fi
     
     # Reopen for subsequent tests
-    local loop_dev=$(losetup -j /tmp/test_loop.img | cut -d: -f1)
-    echo -n "$TEST_PASSWORD" | unlock_device "$loop_dev" "$TEST_LUKS_NAME" "luks" &>/dev/null
+    echo -n "$TEST_PASSWORD" | unlock_device "$TEST_LOOP_UUID" "$TEST_LUKS_MAPPER" "none" "luks" &>/dev/null
 }
 
 # Run all tests
