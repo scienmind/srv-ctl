@@ -140,7 +140,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: test-logs-${{ matrix.os }}
+          name: test-logs-${{ replace(matrix.os, ':', '-') }}
           path: |
             /tmp/test_env.conf
             /var/log/syslog
