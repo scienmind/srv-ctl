@@ -80,8 +80,8 @@ create_loop_device() {
     local loop_dev=$(losetup -f)
     losetup "$loop_dev" "$loop_file"
     
-    echo "$loop_dev"
     log_info "Loop device created: $loop_dev"
+    echo "$loop_dev"
 }
 
 # Create LUKS container on loop device
@@ -89,6 +89,15 @@ create_luks_container() {
     local loop_dev=$1
     
     log_info "Creating LUKS container on $loop_dev..."
+    
+    # Verify device exists and is ready
+    if [[ ! -b "$loop_dev" ]]; then
+        log_error "Loop device $loop_dev does not exist or is not a block device"
+        return 1
+    fi
+    
+    # Wait for device to be ready
+    sleep 1
     
     # Format as LUKS
     echo -n "$TEST_PASSWORD" | cryptsetup luksFormat --type luks2 "$loop_dev" -
