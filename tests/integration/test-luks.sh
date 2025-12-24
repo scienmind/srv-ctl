@@ -3,19 +3,29 @@
 
 set -euo pipefail
 
+# Trap errors to show what failed
+trap 'echo "ERROR: Command failed at line $LINENO: $BASH_COMMAND" >&2' ERR
+
 # Load test environment
+echo "DEBUG: Loading test environment from /tmp/test_env.conf" >&2
 if [[ ! -f /tmp/test_env.conf ]]; then
     echo "ERROR: Test environment not setup. Run setup-test-env.sh first."
     exit 1
 fi
 source /tmp/test_env.conf
+echo "DEBUG: Test environment loaded" >&2
 
 # Load libraries
+echo "DEBUG: Setting up constants" >&2
 export SUCCESS=0
 export FAILURE=1
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+echo "DEBUG: SCRIPT_DIR=$SCRIPT_DIR" >&2
+echo "DEBUG: Loading lib/os-utils.sh" >&2
 source "$SCRIPT_DIR/../../lib/os-utils.sh"
+echo "DEBUG: Loading lib/storage.sh" >&2
 source "$SCRIPT_DIR/../../lib/storage.sh"
+echo "DEBUG: Libraries loaded successfully" >&2
 
 # Test counters
 TESTS_RUN=0
@@ -42,6 +52,10 @@ log_fail() {
     ((TESTS_FAILED++))
 }
 
+log_warn() {
+    echo -e "${YELLOW}[WARN]${NC} $*"
+}
+
 run_test() {
     ((TESTS_RUN++))
     log_test "$1"
@@ -49,8 +63,27 @@ run_test() {
 
 # Test 1: Close and reopen LUKS container
 test_luks_lock_unlock() {
+    echo "DEBUG: Inside test_luks_lock_unlock" >&2
     run_test "LUKS lock and unlock"
     
+    # Deactivate LVM first (LUKS can't be closed while in use)
+    if lvchange -an "$TEST_VG_NAME/$TEST_LV_NAME" 2>/dev/null; then
+        log_pass "Deactivated LVM logical volume"
+    else
+        log_warn "LVM already inactive or deactivation failed"
+    fi
+    
+    if vgchange -an "$TEST_VG_NAME" 2>/dev/null; then
+        log_pass "Deactivated volume group"
+    else
+        log_warn "VG already inactive"
+    fi
+    
+    # Wait for device to be released
+    sleep 1
+    udevadm settle
+    
+    echo "DEBUG: About to call lock_device" >&2
     if lock_device "$TEST_LUKS_MAPPER" "luks"; then
         log_pass "Successfully closed LUKS container"
     else
@@ -81,14 +114,48 @@ test_luks_lock_unlock() {
         log_fail "LUKS container does not exist after open"
         return 1
     fi
+    
+    # Reactivate LVM for subsequent tests
+    if vgchange -ay "$TEST_VG_NAME" 2>/dev/null; then
+        log_pass "Reactivated volume group"
+    else
+        log_warn "Failed to reactivate VG"
+    fi
+    
+    if lvchange -ay "$TEST_VG_NAME/$TEST_LV_NAME" 2>/dev/null; then
+        log_pass "Reactivated LVM after reopening LUKS"
+    else
+        log_warn "Failed to reactivate LVM"
+    fi
 }
 
 # Test 2: Wrong password handling
 test_luks_wrong_password() {
     run_test "LUKS wrong password handling"
     
-    # Close first
-    lock_device "$TEST_LUKS_MAPPER" "luks" &>/dev/null
+    # Deactivate LVM completely (LV + VG)
+    if lvchange -an "$TEST_VG_NAME/$TEST_LV_NAME" 2>/dev/null; then
+        log_pass "Deactivated LVM logical volume"
+    else
+        log_warn "Failed to deactivate LVM"
+    fi
+    
+    if vgchange -an "$TEST_VG_NAME" 2>/dev/null; then
+        log_pass "Deactivated volume group"
+    else
+        log_warn "Failed to deactivate VG"
+    fi
+    
+    # Wait for device to be released
+    sleep 1
+    udevadm settle
+    
+    if lock_device "$TEST_LUKS_MAPPER" "luks"; then
+        log_pass "Closed LUKS container"
+    else
+        log_fail "Failed to close LUKS"
+        return 1
+    fi
     
     # Try to open with wrong password
     if echo -n "wrongpassword" | unlock_device "$TEST_LOOP_UUID" "$TEST_LUKS_MAPPER" "none" "luks" 2>/dev/null; then
@@ -100,11 +167,19 @@ test_luks_wrong_password() {
     
     # Reopen with correct password for subsequent tests
     echo -n "$TEST_PASSWORD" | unlock_device "$TEST_LOOP_UUID" "$TEST_LUKS_MAPPER" "none" "luks" &>/dev/null
+    vgchange -ay "$TEST_VG_NAME" 2>/dev/null || true
+    lvchange -ay "$TEST_VG_NAME/$TEST_LV_NAME" 2>/dev/null || true
 }
 
 # Test 3: Double close handling
 test_luks_double_close() {
     run_test "LUKS double close handling"
+    
+    # Deactivate LVM completely
+    lvchange -an "$TEST_VG_NAME/$TEST_LV_NAME" 2>/dev/null || true
+    vgchange -an "$TEST_VG_NAME" 2>/dev/null || true
+    sleep 1
+    udevadm settle
     
     # Close once
     lock_device "$TEST_LUKS_MAPPER" "luks" &>/dev/null
@@ -119,6 +194,8 @@ test_luks_double_close() {
     
     # Reopen for subsequent tests
     echo -n "$TEST_PASSWORD" | unlock_device "$TEST_LOOP_UUID" "$TEST_LUKS_MAPPER" "none" "luks" &>/dev/null
+    vgchange -ay "$TEST_VG_NAME" 2>/dev/null || true
+    lvchange -ay "$TEST_VG_NAME/$TEST_LV_NAME" 2>/dev/null || true
 }
 
 # Run all tests
@@ -128,9 +205,22 @@ main() {
     echo "========================================="
     echo ""
     
-    test_luks_lock_unlock
-    test_luks_wrong_password
-    test_luks_double_close
+    echo "DEBUG: Checking if test functions exist" >&2
+    type test_luks_lock_unlock >&2 || echo "ERROR: test_luks_lock_unlock not defined" >&2
+    type test_luks_wrong_password >&2 || echo "ERROR: test_luks_wrong_password not defined" >&2
+    type test_luks_double_close >&2 || echo "ERROR: test_luks_double_close not defined" >&2
+    
+    echo "DEBUG: Starting test_luks_lock_unlock" >&2
+    test_luks_lock_unlock || echo "DEBUG: test_luks_lock_unlock returned $?" >&2
+    echo "DEBUG: Completed test_luks_lock_unlock" >&2
+    
+    echo "DEBUG: Starting test_luks_wrong_password" >&2
+    test_luks_wrong_password || echo "DEBUG: test_luks_wrong_password returned $?" >&2
+    echo "DEBUG: Completed test_luks_wrong_password" >&2
+    
+    echo "DEBUG: Starting test_luks_double_close" >&2
+    test_luks_double_close || echo "DEBUG: test_luks_double_close returned $?" >&2
+    echo "DEBUG: Completed test_luks_double_close" >&2
     
     echo ""
     echo "========================================="

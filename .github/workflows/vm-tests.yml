@@ -2,9 +2,10 @@ name: VM Integration Tests
 
 on:
   push:
-    branches: [ main, develop, v2-refactor ]
+    branches: [ main ]
   pull_request:
     branches: [ main, develop ]
+    types: [ opened, synchronize, reopened ]
   workflow_dispatch:  # Manual trigger
   schedule:
     - cron: '0 2 * * 0'  # Weekly on Sunday at 2 AM
@@ -40,6 +41,12 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
         
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          
       - name: Install VM dependencies
         run: |
           sudo apt-get update

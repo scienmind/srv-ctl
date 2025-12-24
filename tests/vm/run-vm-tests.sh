@@ -47,14 +47,23 @@ check_prerequisites() {
 create_cloud_init() {
     local work_dir="$1"
     
-    cat > "$work_dir/user-data" << 'EOF'
+    # Generate SSH key if it doesn't exist
+    local ssh_key="$work_dir/id_rsa"
+    if [[ ! -f "$ssh_key" ]]; then
+        ssh-keygen -t rsa -b 2048 -f "$ssh_key" -N "" -C "srv-ctl-test" &>/dev/null
+    fi
+    local ssh_pub_key=$(cat "$ssh_key.pub")
+    
+    cat > "$work_dir/user-data" << EOF
 #cloud-config
 users:
   - name: testuser
     sudo: ALL=(ALL) NOPASSWD:ALL
     shell: /bin/bash
+    lock_passwd: false
+    passwd: \$6\$rounds=4096\$saltsalt\$IjY1f3qKzVqKqfH5XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
     ssh_authorized_keys:
-      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC srv-ctl-test
+      - $ssh_pub_key
 
 packages:
   - cryptsetup
@@ -68,14 +77,13 @@ packages:
   - curl
 
 runcmd:
-  - systemctl enable systemd-networkd
-  - systemctl start systemd-networkd
+  - systemctl restart sshd
 
 write_files:
   - path: /etc/ssh/sshd_config.d/test.conf
     content: |
       PermitRootLogin yes
-      PasswordAuthentication yes
+      PubkeyAuthentication yes
     permissions: '0644'
 
 final_message: "VM ready for testing"
@@ -113,10 +121,23 @@ start_vm() {
     
     log_step "Starting VM..."
     
+    # Detect if KVM is available
+    local accel="tcg"
+    local cpu_type="qemu64"
+    local max_wait=120
+    if [[ -r /dev/kvm ]] && [[ -w /dev/kvm ]]; then
+        accel="kvm"
+        cpu_type="host"
+        log_info "Using KVM acceleration"
+    else
+        log_info "KVM not available, using TCG (software emulation)"
+        max_wait=300  # TCG is much slower, need more time
+    fi
+    
     qemu-system-x86_64 \
         -name "srv-ctl-test-${OS_VERSION}" \
-        -machine type=q35,accel=kvm \
-        -cpu host \
+        -machine type=q35,accel=$accel \
+        -cpu $cpu_type \
         -m 2048 \
         -smp 2 \
         -drive file="$work_dir/disk.qcow2",if=virtio,format=qcow2 \
@@ -124,16 +145,16 @@ start_vm() {
         -drive file="$work_dir/cloud-init.img",if=virtio,format=raw \
         -netdev user,id=net0,hostfwd=tcp::2222-:22 \
         -device virtio-net-pci,netdev=net0 \
-        -nographic \
+        -display none \
         -pidfile "$work_dir/qemu.pid" \
         -daemonize
     
     # Wait for SSH to be available
     log_info "Waiting for VM to boot..."
-    local max_wait=120
     local waited=0
+    local ssh_key="$work_dir/id_rsa"
     
-    while ! ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+    while ! ssh -i "$ssh_key" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               -p 2222 testuser@localhost "echo VM ready" &>/dev/null; do
         sleep 2
         waited=$((waited + 2))
@@ -160,20 +181,25 @@ run_tests_in_vm() {
         .
     
     # Copy to VM
-    scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+    local ssh_key="$work_dir/id_rsa"
+    scp -i "$ssh_key" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
         -P 2222 "$work_dir/srv-ctl.tar.gz" testuser@localhost:/tmp/
     
     log_step "Running tests in VM..."
     
     # Run tests via SSH
-    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+    ssh -i "$ssh_key" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
         -p 2222 testuser@localhost bash << 'EOSSH'
 set -euo pipefail
 
-# Extract project
-cd /tmp
-tar -xzf srv-ctl.tar.gz
-cd /tmp
+# Wait for cloud-init to complete
+echo "Waiting for cloud-init to finish..."
+cloud-init status --wait || true
+
+# Extract project to a subdirectory
+mkdir -p /tmp/srv-ctl-test
+cd /tmp/srv-ctl-test
+tar -xzf /tmp/srv-ctl.tar.gz
 
 # Setup test config
 cp tests/fixtures/config.local.test config.local
@@ -186,10 +212,11 @@ chmod +x tests/fixtures/*.sh
 chmod +x tests/e2e/*.sh
 
 # Install bats
+cd /tmp
 curl -sSL https://github.com/bats-core/bats-core/archive/v1.10.0.tar.gz | tar -xz
 cd bats-core-1.10.0
 sudo ./install.sh /usr/local
-cd /tmp
+cd /tmp/srv-ctl-test
 
 # Run all test phases
 echo "========================================="
@@ -207,7 +234,7 @@ EOSSH
     
     # Copy results back
     mkdir -p "$RESULTS_DIR"
-    scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+    scp -i "$ssh_key" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
         -P 2222 -r testuser@localhost:/tmp/test-results/* "$RESULTS_DIR/" 2>/dev/null || true
     
     return $exit_code

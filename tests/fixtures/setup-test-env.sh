@@ -29,7 +29,6 @@ log_warn() {
 log_error() {
     echo -e "${RED}[ERROR]${NC} $*" >&2
 }
-
 # Check if running with required privileges
 check_privileges() {
     if [[ $EUID -ne 0 ]]; then
@@ -117,14 +116,74 @@ create_lvm_on_luks() {
     
     local luks_dev="/dev/mapper/$TEST_LUKS_NAME"
     
+    log_info "DEBUG: Checking LUKS device..."
+    ls -la "$luks_dev" || log_error "LUKS device not found"
+    
     # Create physical volume
     pvcreate "$luks_dev"
+    
+    # Wait for device to be ready
+    udevadm settle
+    
+    log_info "DEBUG: PV created, checking pvs..."
+    pvs
     
     # Create volume group
     vgcreate "$TEST_VG_NAME" "$luks_dev"
     
-    # Create logical volume (use most of the space)
-    lvcreate -L 90M -n "$TEST_LV_NAME" "$TEST_VG_NAME"
+    # Wait for VG to be ready
+    udevadm settle
+    vgscan --mknodes
+    
+    log_info "DEBUG: VG created, checking vgs and free space..."
+    vgs
+    vgdisplay "$TEST_VG_NAME"
+    
+    log_info "DEBUG: Checking /dev/$TEST_VG_NAME/ directory..."
+    ls -la "/dev/$TEST_VG_NAME/" || log_warn "VG directory not found yet"
+    
+    log_info "DEBUG: Checking device mapper..."
+    dmsetup ls
+    
+    # Create logical volume (skip zeroing for speed and don't activate yet)
+    log_info "DEBUG: Creating LV with -Zn -an flags..."
+    lvcreate -Zn -an -L 70M -n "$TEST_LV_NAME" "$TEST_VG_NAME" -y
+    
+    log_info "DEBUG: LV created (inactive), checking lvs..."
+    lvs
+    
+    # Activate the logical volume
+    log_info "DEBUG: Activating LV..."
+    lvchange -ay "$TEST_VG_NAME/$TEST_LV_NAME"
+    
+    log_info "DEBUG: Waiting for device nodes..."
+    udevadm settle
+    sleep 2
+    
+    log_info "DEBUG: Creating device nodes explicitly..."
+    dmsetup mknodes
+    vgmknodes
+    
+    log_info "DEBUG: Checking all possible device paths..."
+    ls -la "/dev/$TEST_VG_NAME/" 2>/dev/null || log_warn "VG directory still not found"
+    ls -la /dev/mapper/test* 2>/dev/null || log_warn "No test devices in mapper"
+    
+    # Check if the mapper device exists (primary path)
+    local mapper_path="/dev/mapper/$TEST_VG_NAME-$TEST_LV_NAME"
+    if [[ ! -b "$mapper_path" ]]; then
+        log_error "LV mapper device not found at $mapper_path"
+        log_error "Trying to force device creation..."
+        dmsetup ls --tree
+        lvchange -ay --yes "$TEST_VG_NAME/$TEST_LV_NAME"
+        udevadm settle
+        dmsetup mknodes
+        sleep 1
+        ls -la /dev/mapper/test* 2>/dev/null || true
+    fi
+    
+    log_info "DEBUG: Final device check..."
+    ls -la "/dev/$TEST_VG_NAME/$TEST_LV_NAME" 2>/dev/null || log_warn "Symlink not found, but mapper may exist"
+    ls -la "$mapper_path" || log_error "LV mapper device still not found after all attempts"
     
     # Trigger udev to create symlinks
     udevadm settle
