@@ -113,10 +113,23 @@ start_vm() {
     
     log_step "Starting VM..."
     
+    # Detect if KVM is available
+    local accel="tcg"
+    local cpu_type="qemu64"
+    local max_wait=120
+    if [[ -r /dev/kvm ]] && [[ -w /dev/kvm ]]; then
+        accel="kvm"
+        cpu_type="host"
+        log_info "Using KVM acceleration"
+    else
+        log_info "KVM not available, using TCG (software emulation)"
+        max_wait=300  # TCG is much slower, need more time
+    fi
+    
     qemu-system-x86_64 \
         -name "srv-ctl-test-${OS_VERSION}" \
-        -machine type=q35,accel=kvm \
-        -cpu host \
+        -machine type=q35,accel=$accel \
+        -cpu $cpu_type \
         -m 2048 \
         -smp 2 \
         -drive file="$work_dir/disk.qcow2",if=virtio,format=qcow2 \
@@ -124,13 +137,12 @@ start_vm() {
         -drive file="$work_dir/cloud-init.img",if=virtio,format=raw \
         -netdev user,id=net0,hostfwd=tcp::2222-:22 \
         -device virtio-net-pci,netdev=net0 \
-        -nographic \
+        -display none \
         -pidfile "$work_dir/qemu.pid" \
         -daemonize
     
     # Wait for SSH to be available
     log_info "Waiting for VM to boot..."
-    local max_wait=120
     local waited=0
     
     while ! ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \

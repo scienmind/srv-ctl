@@ -3,19 +3,29 @@
 
 set -euo pipefail
 
+# Trap errors to show what failed
+trap 'echo "ERROR: Command failed at line $LINENO: $BASH_COMMAND" >&2' ERR
+
 # Load test environment
+echo "DEBUG: Loading test environment from /tmp/test_env.conf" >&2
 if [[ ! -f /tmp/test_env.conf ]]; then
     echo "ERROR: Test environment not setup. Run setup-test-env.sh first."
     exit 1
 fi
 source /tmp/test_env.conf
+echo "DEBUG: Test environment loaded" >&2
 
 # Load libraries
+echo "DEBUG: Setting up constants" >&2
 export SUCCESS=0
 export FAILURE=1
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+echo "DEBUG: SCRIPT_DIR=$SCRIPT_DIR" >&2
+echo "DEBUG: Loading lib/os-utils.sh" >&2
 source "$SCRIPT_DIR/../../lib/os-utils.sh"
+echo "DEBUG: Loading lib/storage.sh" >&2
 source "$SCRIPT_DIR/../../lib/storage.sh"
+echo "DEBUG: Libraries loaded successfully" >&2
 
 # Test counters
 TESTS_RUN=0
@@ -40,6 +50,10 @@ log_pass() {
 log_fail() {
     echo -e "${RED}[FAIL]${NC} $*"
     ((TESTS_FAILED++))
+}
+
+log_warn() {
+    echo -e "${YELLOW}[WARN]${NC} $*"
 }
 
 run_test() {
@@ -192,11 +206,16 @@ main() {
     echo "========================================="
     echo ""
     
-    test_mount_unmount
-    test_mount_write_read
-    test_double_mount
-    test_double_unmount
-    test_mount_none_device
+    echo "DEBUG: Starting test_mount_unmount" >&2
+    test_mount_unmount || echo "DEBUG: test_mount_unmount returned $?" >&2
+    echo "DEBUG: Starting test_mount_write_read" >&2
+    test_mount_write_read || echo "DEBUG: test_mount_write_read returned $?" >&2
+    echo "DEBUG: Starting test_double_mount" >&2
+    test_double_mount || echo "DEBUG: test_double_mount returned $?" >&2
+    echo "DEBUG: Starting test_double_unmount" >&2
+    test_double_unmount || echo "DEBUG: test_double_unmount returned $?" >&2
+    echo "DEBUG: Starting test_mount_none_device" >&2
+    test_mount_none_device || echo "DEBUG: test_mount_none_device returned $?" >&2
     
     echo ""
     echo "========================================="

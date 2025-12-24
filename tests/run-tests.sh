@@ -170,10 +170,11 @@ run_integration_tests() {
     
     for test_file in "${test_files[@]}"; do
         log_info "Running: $(basename "$test_file")"
-        if "$test_file"; then
+        if "$test_file" 2>&1; then
             log_success "✓ Integration tests passed"
         else
-            log_error "✗ Integration tests failed"
+            exit_code=$?
+            log_error "✗ Integration tests failed (exit code: $exit_code)"
             failed=1
         fi
     done
