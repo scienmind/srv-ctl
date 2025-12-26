@@ -440,6 +440,7 @@ function _validate_service() {
     else
         echo "ℹ️  $name: disabled"
     fi
+    return $SUCCESS
 }
 
 function _validate_simple_service() {
@@ -449,6 +450,7 @@ function _validate_simple_service() {
     else
         echo "ℹ️  $name: disabled"
     fi
+    return $SUCCESS
 }
 
 function _validate_device() {

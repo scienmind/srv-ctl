@@ -114,7 +114,10 @@ function deactivate_lvm() {
         return "$SUCCESS"
     fi
 
-    verify_lvm "$l_lvm_name" "$l_lvm_group"
+    # Skip if LVM doesn't exist (may have been removed)
+    if ! lvdisplay "$l_lvm_group/$l_lvm_name" >/dev/null 2>&1; then
+        return "$SUCCESS"
+    fi
 
     if lvm_is_active "$l_lvm_name" "$l_lvm_group"; then
         echo "Deactivating $l_lvm_name..."
