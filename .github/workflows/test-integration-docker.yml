@@ -1,0 +1,36 @@
+name: Integration Tests (Docker)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  docker:
+    name: ${{ matrix.os }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [debian:11, debian:12, debian:13, ubuntu:22.04, ubuntu:24.04]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run tests (${{ matrix.os }})
+        run: |
+          docker run --rm --privileged \
+            -e DEBIAN_FRONTEND=noninteractive \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            ${{ matrix.os }} \
+            bash -c '
+              set -euo pipefail
+              apt-get update -qq
+              apt-get install -y -qq bash cryptsetup lvm2 dosfstools ntfs-3g util-linux sudo udev e2fsprogs
+              bash tests/fixtures/setup-test-env.sh
+              bash tests/integration/test-luks.sh
+              bash tests/integration/test-lvm.sh
+              bash tests/integration/test-mount.sh
+              bash tests/fixtures/cleanup-test-env.sh
+            '
