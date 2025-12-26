@@ -3,7 +3,6 @@
 
 set -euo pipefail
 
-# Debug mode - set TEST_DEBUG=1 to enable verbose output
 DEBUG="${TEST_DEBUG:-0}"
 debug() { [[ "$DEBUG" == "1" ]] && echo "DEBUG: $*" >&2 || true; }
 
@@ -189,34 +188,34 @@ main() {
     echo "========================================="
     echo ""
     
-    echo "DEBUG: Starting test 1..."
+    debug "Starting test 1..."
     if test_luks_lock_unlock; then
         pass_test
-        echo "DEBUG: Test 1 passed"
+        debug "Test 1 passed"
     else
         fail_test
-        echo "DEBUG: Test 1 failed"
+        debug "Test 1 failed"
     fi
     
-    echo "DEBUG: Starting test 2..."
+    debug "Starting test 2..."
     if test_luks_wrong_password; then
         pass_test
-        echo "DEBUG: Test 2 passed"
+        debug "Test 2 passed"
     else
         fail_test
-        echo "DEBUG: Test 2 failed"
+        debug "Test 2 failed"
     fi
     
-    echo "DEBUG: Starting test 3..."
+    debug "Starting test 3..."
     if test_luks_double_close; then
         pass_test
-        echo "DEBUG: Test 3 passed"
+        debug "Test 3 passed"
     else
         fail_test
-        echo "DEBUG: Test 3 failed"
+        debug "Test 3 failed"
     fi
     
-    echo "DEBUG: All tests completed, showing summary..."
+    debug "All tests completed, showing summary..."
     
     echo ""
     echo "========================================="

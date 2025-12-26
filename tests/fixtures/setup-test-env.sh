@@ -39,9 +39,34 @@ check_privileges() {
 
 # Install required packages
 install_dependencies() {
+
+    export DEBIAN_FRONTEND=noninteractive
+    export LANG=C.UTF-8
+    export LC_ALL=C.UTF-8
+
     log_info "Installing test dependencies..."
-    
+
+    exfat_pkg="exfatprogs" # default for modern distros
     if command -v apt-get &> /dev/null; then
+        # Purge problematic packages on Debian 10 before any install
+        . /etc/os-release
+        if [[ "$ID" == "debian" && ${VERSION_ID%%.*} -eq 10 ]]; then
+            log_warn "Purging console-setup and keyboard-configuration to avoid dpkg errors (Debian 10 workaround)..."
+            apt-get remove --purge -y console-setup keyboard-configuration || true
+            dpkg --configure -a || true
+        fi
+        # Detect Ubuntu/Debian version for exFAT package
+        . /etc/os-release
+        if [[ ( "$ID" == "ubuntu" && ${VERSION_ID%%.*} -lt 22 ) || ( "$ID" == "debian" && ${VERSION_ID%%.*} -lt 11 ) ]]; then
+            exfat_pkg="exfat-utils"
+        fi
+        # Fix apt sources for Debian 10 (buster) to use archive.debian.org
+        if [[ "$ID" == "debian" && ${VERSION_ID%%.*} -eq 10 ]]; then
+            log_info "Rewriting apt sources for Debian 10 (buster) archive..."
+            sed -i 's|http://deb.debian.org/debian|http://archive.debian.org/debian|g' /etc/apt/sources.list
+            sed -i 's|http://security.debian.org/debian-security|http://archive.debian.org/debian-security|g' /etc/apt/sources.list
+            echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/99no-check-valid-until
+        fi
         apt-get update -qq
         apt-get install -y -qq \
             cryptsetup \
@@ -49,7 +74,7 @@ install_dependencies() {
             dosfstools \
             ntfs-3g \
             exfat-fuse \
-            exfatprogs \
+            "$exfat_pkg" \
             util-linux
     elif command -v yum &> /dev/null; then
         yum install -y -q \
@@ -63,7 +88,16 @@ install_dependencies() {
         log_error "Unsupported package manager"
         exit 1
     fi
-    
+
+    # Workaround for console-setup errors on old Debian
+    if [[ -f /var/lib/dpkg/info/console-setup.postinst ]]; then
+        log_warn "Attempting to fix or remove broken console-setup package (Debian 10 workaround)..."
+        dpkg --configure -a || true
+        apt-get -f install || true
+        dpkg-reconfigure console-setup || true
+        apt-get remove --purge -y console-setup || true
+    fi
+
     log_info "Dependencies installed"
 }
 
@@ -76,9 +110,10 @@ create_loop_device() {
     dd if=/dev/zero of="$loop_file" bs=1M count=$TEST_LOOP_SIZE_MB status=none
     
     # Setup loop device
-    local loop_dev=$(losetup -f)
+    local loop_dev
+    loop_dev=$(losetup -f)
     losetup "$loop_dev" "$loop_file"
-    
+
     log_info "Loop device created: $loop_dev"
     echo "$loop_dev"
 }

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Main test runner script
-# Runs syntax checks, unit tests, and integration tests
+# Runs end-to-end and integration tests
 
 set -euo pipefail
 
@@ -39,116 +39,17 @@ log_phase() {
     echo ""
 }
 
-# Phase 1: Syntax and ShellCheck
-run_syntax_checks() {
-    log_phase "PHASE 1: Syntax and Lint Checks"
-    
-    local files=(
-        "$PROJECT_ROOT/srv-ctl.sh"
-        "$PROJECT_ROOT/lib/os-utils.sh"
-        "$PROJECT_ROOT/lib/storage.sh"
-    )
-    
-    local failed=0
-    
-    for file in "${files[@]}"; do
-        log_info "Checking syntax: $(basename "$file")"
-        if bash -n "$file"; then
-            log_success "✓ Syntax check passed"
-        else
-            log_error "✗ Syntax check failed"
-            failed=1
-        fi
-        
-        # Run shellcheck if available
-        if command -v shellcheck &>/dev/null; then
-            log_info "Running shellcheck: $(basename "$file")"
-            if shellcheck -x "$file"; then
-                log_success "✓ ShellCheck passed"
-            else
-                log_error "✗ ShellCheck found issues"
-                failed=1
-            fi
-        fi
-    done
-    
-    if [[ $failed -eq 0 ]]; then
-        PHASE_PASSED+=("Phase 1: Syntax and Lint")
-        return 0
-    else
-        PHASE_FAILED+=("Phase 1: Syntax and Lint")
-        return 1
-    fi
-}
 
-# Phase 2: Unit Tests
-run_unit_tests() {
-    log_phase "PHASE 2: Unit Tests (bats)"
-    
-    if ! command -v bats &>/dev/null; then
-        log_error "bats not installed. Install with: npm install -g bats"
-        PHASE_FAILED+=("Phase 2: Unit Tests (bats not installed)")
-        return 1
-    fi
-    
-    local test_files=(
-        "$SCRIPT_DIR/unit/test-os-utils.bats"
-        "$SCRIPT_DIR/unit/test-storage.bats"
-    )
-    
-    local failed=0
-    
-    for test_file in "${test_files[@]}"; do
-        log_info "Running: $(basename "$test_file")"
-        if bats "$test_file"; then
-            log_success "✓ Unit tests passed"
-        else
-            log_error "✗ Unit tests failed"
-            failed=1
-        fi
-    done
-    
-    if [[ $failed -eq 0 ]]; then
-        PHASE_PASSED+=("Phase 2: Unit Tests")
-        return 0
-    else
-        PHASE_FAILED+=("Phase 2: Unit Tests")
-        return 1
-    fi
-}
 
-# Phase 3: End-to-End Tests
-run_e2e_tests() {
-    log_phase "PHASE 3: End-to-End Tests"
-    
-    local test_file="$SCRIPT_DIR/e2e/test-e2e.sh"
-    
-    if [[ ! -f "$test_file" ]]; then
-        log_error "E2E test file not found: $test_file"
-        PHASE_FAILED+=("Phase 3: E2E Tests (file not found)")
-        return 1
-    fi
-    
-    log_info "Running: $(basename "$test_file")"
-    if "$test_file"; then
-        log_success "✓ E2E tests passed"
-        PHASE_PASSED+=("Phase 3: End-to-End Tests")
-        return 0
-    else
-        log_error "✗ E2E tests failed"
-        PHASE_FAILED+=("Phase 3: End-to-End Tests")
-        return 1
-    fi
-}
 
-# Phase 4: Integration Tests
+# Phase 1: Integration Tests
 run_integration_tests() {
-    log_phase "PHASE 4: Integration Tests (requires root)"
+    log_phase "PHASE 1: Integration Tests (requires root)"
     
     if [[ $EUID -ne 0 ]]; then
         log_error "Integration tests require root privileges"
         log_info "Run with: sudo $0 --integration"
-        PHASE_FAILED+=("Phase 4: Integration Tests (root required)")
+        PHASE_FAILED+=("Phase 1: Integration Tests (root required)")
         return 1
     fi
     
@@ -156,7 +57,9 @@ run_integration_tests() {
     log_info "Setting up test environment..."
     if ! "$SCRIPT_DIR/fixtures/setup-test-env.sh"; then
         log_error "Failed to setup test environment"
-        PHASE_FAILED+=("Phase 4: Integration Tests (setup failed)")
+        log_info "Running cleanup after failed setup..."
+        "$SCRIPT_DIR/fixtures/cleanup-test-env.sh" || true
+        PHASE_FAILED+=("Phase 1: Integration Tests (setup failed)")
         return 1
     fi
     
@@ -184,10 +87,34 @@ run_integration_tests() {
     "$SCRIPT_DIR/fixtures/cleanup-test-env.sh"
     
     if [[ $failed -eq 0 ]]; then
-        PHASE_PASSED+=("Phase 4: Integration Tests")
+        PHASE_PASSED+=("Phase 1: Integration Tests")
         return 0
     else
-        PHASE_FAILED+=("Phase 4: Integration Tests")
+        PHASE_FAILED+=("Phase 1: Integration Tests")
+        return 1
+    fi
+}
+
+# Phase 2: End-to-End Tests
+run_e2e_tests() {
+    log_phase "PHASE 2: End-to-End Tests"
+    
+    local test_file="$SCRIPT_DIR/e2e/test-e2e.sh"
+    
+    if [[ ! -f "$test_file" ]]; then
+        log_error "E2E test file not found: $test_file"
+        PHASE_FAILED+=("Phase 2: E2E Tests (file not found)")
+        return 1
+    fi
+    
+    log_info "Running: $(basename "$test_file")"
+    if "$test_file"; then
+        log_success "✓ E2E tests passed"
+        PHASE_PASSED+=("Phase 2: End-to-End Tests")
+        return 0
+    else
+        log_error "✗ E2E tests failed"
+        PHASE_FAILED+=("Phase 2: End-to-End Tests")
         return 1
     fi
 }
@@ -223,84 +150,24 @@ print_summary() {
 
 # Main
 main() {
-    local run_syntax=true
-    local run_unit=true
     local run_e2e=true
-    local run_integration=false
-    
-    # Parse arguments
-    while [[ $# -gt 0 ]]; do
-        case $1 in
-            --syntax-only)
-                run_unit=false
-                run_e2e=false
-                run_integration=false
-                shift
-                ;;
-            --unit-only)
-                run_syntax=false
-                run_e2e=false
-                run_integration=false
-                shift
-                ;;
-            --e2e-only)
-                run_syntax=false
-                run_unit=false
-                run_integration=false
-                shift
-                ;;
-            --integration-only)
-                run_syntax=false
-                run_unit=false
-                run_e2e=false
-                run_integration=true
-                shift
-                ;;
-            --integration|--all)
-                run_integration=true
-                shift
-                ;;
-            --help)
-                echo "Usage: $0 [OPTIONS]"
-                echo ""
-                echo "Options:"
-                echo "  --syntax-only         Run only syntax and lint checks"
-                echo "  --unit-only           Run only unit tests"
-                echo "  --e2e-only            Run only end-to-end tests"
-                echo "  --integration-only    Run only integration tests (requires root)"
-                echo "  --integration, --all  Run all tests including integration (requires root)"
-                echo "  --help                Show this help message"
-                echo ""
-                echo "Default: Run syntax checks, unit tests, and e2e tests (no root required)"
-                exit 0
-                ;;
-            *)
-                log_error "Unknown option: $1"
-                exit 1
-                ;;
-        esac
-    done
-    
+    local run_integration=true
+    # No argument parsing for syntax/lint/unit phases; handled in dedicated CI jobs
+
     log_info "Starting test suite..."
-    
-    if $run_syntax; then
-        run_syntax_checks || true
-    fi
-    
-    if $run_unit; then
-        run_unit_tests || true
-    fi
-    
-    if $run_e2e; then
-        run_e2e_tests || true
-    fi
-    
+
+    # Syntax/lint and unit tests are now run only in dedicated CI jobs
+
     if $run_integration; then
         run_integration_tests || true
     fi
-    
+
+    if $run_e2e; then
+        run_e2e_tests || true
+    fi
+
     print_summary
-    
+
     # Exit with error if any phase failed
     if [[ ${#PHASE_FAILED[@]} -gt 0 ]]; then
         exit 1

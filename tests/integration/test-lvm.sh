@@ -3,7 +3,6 @@
 
 set -euo pipefail
 
-# Debug mode - set TEST_DEBUG=1 to enable verbose output
 DEBUG="${TEST_DEBUG:-0}"
 debug() { [[ "$DEBUG" == "1" ]] && echo "DEBUG: $*" >&2 || true; }
 

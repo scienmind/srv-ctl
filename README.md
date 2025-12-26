@@ -14,6 +14,8 @@ Small utility to manage home server services dependent on encrypted storage.
 ## Requirements
 
 - **cryptsetup**: Version 2.4.0+ (supports both LUKS and BitLocker encryption)
+   - Note: cryptsetup >=2.4.0 is only available in Debian 12+ and Ubuntu 22.04+.
+   - BitLocker support and all E2E/integration tests require these or newer OS versions.
 - **lvm2**: Required only if using LVM volumes
 - **GNU coreutils**: Required for version comparison (`sort -V`)
 - **systemd**: Required for service management
@@ -37,7 +39,6 @@ readonly ST_USER_2="bob"
 # Service names (constructed automatically)
 readonly ST_SERVICE_1="syncthing@${ST_USER_1}.service"
 readonly ST_SERVICE_2="syncthing@${ST_USER_2}.service"
-readonly DOCKER_SERVICE="docker.service"
 ```
 
 ### Storage Device Configuration
@@ -103,14 +104,11 @@ Use `./srv-ctl.sh validate-config` to check your configuration after updating.
 
 ## Development & Testing
 
-The project includes comprehensive tests with Docker and VM-based testing:
+The project includes comprehensive tests with VM-based testing:
 
 ```bash
 # Run local tests (no root required)
 ./tests/run-tests.sh
-
-# Run tests in Docker (isolated, safe)
-./tests/docker/run-docker-tests.sh
 
 # Run full VM tests (CI only, multi-OS)
 ./tests/vm/run-vm-tests.sh ubuntu-22.04

@@ -102,7 +102,8 @@ function build_mount_options() {
     fi
     
     # Add additional options
-    if [ "$l_additional_options" != "none" ] && [ "$l_additional_options" != "defaults" ]; then
+        # Only add 'defaults' if no other options are present. Never combine 'defaults' with explicit options.
+        if [ "$l_additional_options" != "none" ] && [ "$l_additional_options" != "defaults" ]; then
         if [ -n "$l_final_options" ]; then
             l_final_options="$l_final_options,$l_additional_options"
         else
@@ -126,8 +127,13 @@ function build_mount_options() {
 function stop_service() {
     local l_service=$1
 
+
     if [ "$l_service" == "none" ]; then
         return "$SUCCESS"
+    fi
+    if [ -z "$l_service" ]; then
+        echo "ERROR: stop_service called with empty service name" >&2
+        return "$FAILURE"
     fi
 
     echo "Stopping \"$l_service\" service..."
@@ -145,8 +151,13 @@ function stop_service() {
 function start_service() {
     local l_service=$1
 
+
     if [ "$l_service" == "none" ]; then
         return "$SUCCESS"
+    fi
+    if [ -z "$l_service" ]; then
+        echo "ERROR: start_service called with empty service name" >&2
+        return "$FAILURE"
     fi
 
     echo "Starting \"$l_service\" service..."

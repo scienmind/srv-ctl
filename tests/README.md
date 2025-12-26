@@ -6,20 +6,16 @@
 # Local tests (syntax + unit + e2e) - SAFE, no root required
 ./tests/run-tests.sh
 
-# Docker tests (includes integration) - SAFE, isolated container
-./tests/docker/run-docker-tests.sh
-
 # VM tests (full system validation) - CI only, multi-OS
 ./tests/vm/run-vm-tests.sh <os-name>
 ```
 
 ## Test Levels
 
-| Level | Safety | Root | Isolation | Use Case |
-|-------|--------|------|-----------|----------|
-| **Local** | ✅ Safe | No | None needed | Quick development feedback |
-| **Docker** | ✅ Safe | No | Container | Integration with LUKS/LVM/mounts |
-| **VM** | ✅ Safe | No | Full VM | Multi-OS validation, systemd |
+| Level      | Safety | Root | Isolation | Use Case                          |
+|------------|--------|------|-----------|-----------------------------------|
+| **Local**  | ✅ Safe | No   | None      | Quick development feedback        |
+| **VM**     | ✅ Safe | No   | Full VM   | Multi-OS validation, systemd      |
 
 ### Local Tests
 
@@ -33,17 +29,6 @@ Syntax checks, unit tests (bats), and e2e tests. Fast feedback loop for developm
 ```
 
 **Requirements**: `bats`, `shellcheck`
-
-### Docker Tests (Recommended)
-
-All local tests plus integration tests requiring privileged operations (LUKS, LVM, mounting).
-
-```bash
-./tests/docker/run-docker-tests.sh           # All tests
-./tests/docker/run-docker-tests.sh --rebuild # Force image rebuild
-```
-
-**Requirements**: Docker
 
 ### VM Tests (CI Primary)
 
@@ -61,7 +46,6 @@ Tests run automatically via GitHub Actions on push to main and pull requests:
 
 - **Lint**: ShellCheck and bash syntax validation
 - **Unit Tests**: bats framework
-- **Docker Integration**: Privileged containers across multiple OS versions
 - **VM Integration**: QEMU VMs with cloud-init across multiple OS versions
 
 See `.github/workflows/` for workflow definitions and the current OS matrix.
@@ -93,7 +77,7 @@ test_feature() {
 }
 ```
 
-### Integration Tests (Docker/VM only)
+### Integration Tests (VM only)
 
 ```bash
 test_system_operation() {
@@ -116,9 +100,8 @@ test_system_operation() {
 ## Safety
 
 - ✅ **Local tests**: Zero system impact
-- ✅ **Docker tests**: Isolated containers, auto-cleanup
 - ✅ **VM tests**: Full VMs, no host interaction
-- ❌ **Never run integration tests directly on host** (use Docker/VM)
+- ❌ **Never run integration tests directly on host** (use VM)
 
 ## Troubleshooting
 
@@ -126,16 +109,6 @@ test_system_operation() {
 
 ```bash
 npm install -g bats
-```
-
-### Docker tests fail
-
-```bash
-# Ensure Docker is running
-docker info
-
-# Rebuild image
-./tests/docker/run-docker-tests.sh --rebuild
 ```
 
 ### VM tests fail
@@ -155,9 +128,8 @@ tests/
 ├── run-tests.sh          # Main local test runner
 ├── unit/                 # Unit tests (bats)
 ├── e2e/                  # End-to-end tests  
-├── integration/          # Integration tests (Docker/VM only)
+├── integration/          # Integration tests (VM only)
 ├── fixtures/             # Test configs and helpers
-├── docker/               # Docker test infrastructure
 └── vm/                   # VM test infrastructure
 ```
 

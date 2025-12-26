@@ -1,4 +1,4 @@
-name: Integration Tests (VM)
+name: E2E Tests (VM)
 
 on:
   push:
@@ -13,6 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Only test OSes with cryptsetup >=2.4.0 (BitLocker support): Debian 12+, Ubuntu 22.04+
         os: [debian-12, debian-13, ubuntu-22.04, ubuntu-24.04]
     steps:
       - uses: actions/checkout@v4
@@ -22,7 +23,7 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      
+          
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y qemu-system-x86 qemu-utils cloud-image-utils
       
@@ -31,19 +32,23 @@ jobs:
         with:
           path: ~/.cache/vm-images
           key: vm-image-${{ matrix.os }}
-      
+          
       - name: Download cloud image
         run: |
           mkdir -p ~/.cache/vm-images
           ./tests/vm/download-image.sh ${{ matrix.os }}
       
-      - name: Run tests (${{ matrix.os }})
+      - name: Run E2E tests (${{ matrix.os }})
         timeout-minutes: 15
-        run: ./tests/vm/run-vm-tests.sh ${{ matrix.os }}
+        run: ./tests/vm/run-e2e-vm-tests.sh ${{ matrix.os }}
       
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: vm-results-${{ matrix.os }}
+          name: e2e-results-${{ matrix.os }}
           path: tests/vm/results/
+          
+      - name: Cleanup
+        if: always()
+        run: ./tests/vm/cleanup.sh
