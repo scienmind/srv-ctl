@@ -74,7 +74,7 @@ test_mount_unmount() {
         log_pass "Successfully mounted device"
     else
         log_fail "Failed to mount device"
-        return 1
+        return "$FAILURE"
     fi
     
     # Verify it's mounted
@@ -82,14 +82,14 @@ test_mount_unmount() {
         log_pass "Device is mounted"
     else
         log_fail "Device is not mounted"
-        return 1
+        return "$FAILURE"
     fi
     
     if unmount_device "$TEST_MOUNT_POINT"; then
         log_pass "Successfully unmounted device"
     else
         log_fail "Failed to unmount device"
-        return 1
+        return "$FAILURE"
     fi
     
     # Verify it's unmounted
@@ -97,8 +97,10 @@ test_mount_unmount() {
         log_pass "Device is unmounted"
     else
         log_fail "Device is still mounted"
-        return 1
+        return "$FAILURE"
     fi
+    
+    return "$SUCCESS"
 }
 
 # Test 2: Write and read test
@@ -115,7 +117,7 @@ test_mount_write_read() {
         log_pass "Successfully wrote test file"
     else
         log_fail "Failed to write test file"
-        return 1
+        return "$FAILURE"
     fi
     
     unmount_device "$TEST_MOUNT_POINT" &>/dev/null
@@ -131,16 +133,18 @@ test_mount_write_read() {
             log_pass "Successfully read test file with correct content"
         else
             log_fail "Test file content mismatch"
-            return 1
+            return "$FAILURE"
         fi
     else
         log_fail "Test file does not exist after remount"
-        return 1
+        return "$FAILURE"
     fi
     
     # Cleanup
     rm -f "$test_file"
     unmount_device "$TEST_MOUNT_POINT" &>/dev/null
+    
+    return "$SUCCESS"
 }
 
 # Test 3: Double mount handling
@@ -156,11 +160,13 @@ test_double_mount() {
     else
         log_fail "Double mount returned error"
         unmount_device "$TEST_MOUNT_POINT" &>/dev/null
-        return 1
+        return "$FAILURE"
     fi
     
     # Cleanup
     unmount_device "$TEST_MOUNT_POINT" &>/dev/null
+    
+    return "$SUCCESS"
 }
 
 # Test 4: Double unmount handling
@@ -178,8 +184,10 @@ test_double_unmount() {
         log_pass "Double unmount handled gracefully"
     else
         log_fail "Double unmount returned error"
-        return 1
+        return "$FAILURE"
     fi
+    
+    return "$SUCCESS"
 }
 
 # Test 5: Mount with "none" device handling
@@ -191,7 +199,7 @@ test_mount_none_device() {
         log_pass "mount_device with 'none' device handled correctly"
     else
         log_fail "mount_device with 'none' device returned error"
-        return 1
+        return "$FAILURE"
     fi
     
     # Verify nothing was actually mounted
@@ -200,8 +208,10 @@ test_mount_none_device() {
     else
         log_fail "Something was mounted for 'none' device"
         unmount_device "test_none" &>/dev/null
-        return 1
+        return "$FAILURE"
     fi
+    
+    return "$SUCCESS"
 }
 
 # Run all tests

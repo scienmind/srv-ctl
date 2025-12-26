@@ -93,7 +93,7 @@ test_luks_lock_unlock() {
         log_pass "Successfully closed LUKS container"
     else
         log_fail "Failed to close LUKS container"
-        return 1
+        return "$FAILURE"
     fi
     
     # Verify it's closed
@@ -101,7 +101,7 @@ test_luks_lock_unlock() {
         log_pass "LUKS container is closed"
     else
         log_fail "LUKS container still exists after close"
-        return 1
+        return "$FAILURE"
     fi
     
     # Reopen LUKS using UUID
@@ -109,7 +109,7 @@ test_luks_lock_unlock() {
         log_pass "Successfully reopened LUKS container"
     else
         log_fail "Failed to reopen LUKS container"
-        return 1
+        return "$FAILURE"
     fi
     
     # Verify it's open
@@ -117,7 +117,7 @@ test_luks_lock_unlock() {
         log_pass "LUKS container is open"
     else
         log_fail "LUKS container does not exist after open"
-        return 1
+        return "$FAILURE"
     fi
     
     # Reactivate LVM for subsequent tests
@@ -132,6 +132,8 @@ test_luks_lock_unlock() {
     else
         log_warn "Failed to reactivate LVM"
     fi
+    
+    return "$SUCCESS"
 }
 
 # Test 2: Wrong password handling
@@ -159,13 +161,13 @@ test_luks_wrong_password() {
         log_pass "Closed LUKS container"
     else
         log_fail "Failed to close LUKS"
-        return 1
+        return "$FAILURE"
     fi
     
     # Try to open with wrong password
     if echo -n "wrongpassword" | unlock_device "$TEST_LOOP_UUID" "$TEST_LUKS_MAPPER" "none" "luks" 2>/dev/null; then
         log_fail "LUKS opened with wrong password (should have failed)"
-        return 1
+        return "$FAILURE"
     else
         log_pass "LUKS correctly rejected wrong password"
     fi
@@ -174,6 +176,8 @@ test_luks_wrong_password() {
     echo -n "$TEST_PASSWORD" | unlock_device "$TEST_LOOP_UUID" "$TEST_LUKS_MAPPER" "none" "luks" &>/dev/null
     vgchange -ay "$TEST_VG_NAME" 2>/dev/null || true
     lvchange -ay "$TEST_VG_NAME/$TEST_LV_NAME" 2>/dev/null || true
+    
+    return "$SUCCESS"
 }
 
 # Test 3: Double close handling
@@ -194,13 +198,15 @@ test_luks_double_close() {
         log_pass "Double close handled gracefully"
     else
         log_fail "Double close returned error"
-        return 1
+        return "$FAILURE"
     fi
     
     # Reopen for subsequent tests
     echo -n "$TEST_PASSWORD" | unlock_device "$TEST_LOOP_UUID" "$TEST_LUKS_MAPPER" "none" "luks" &>/dev/null
     vgchange -ay "$TEST_VG_NAME" 2>/dev/null || true
     lvchange -ay "$TEST_VG_NAME/$TEST_LV_NAME" 2>/dev/null || true
+    
+    return "$SUCCESS"
 }
 
 # Run all tests

@@ -74,8 +74,10 @@ test_lvm_verify() {
         log_pass "LVM verification successful"
     else
         log_fail "LVM verification failed"
-        return 1
+        return "$FAILURE"
     fi
+    
+    return "$SUCCESS"
 }
 
 # Test 2: Check if LVM is active
@@ -86,8 +88,10 @@ test_lvm_is_active() {
         log_pass "LVM is active"
     else
         log_fail "LVM is not active"
-        return 1
+        return "$FAILURE"
     fi
+    
+    return "$SUCCESS"
 }
 
 # Test 3: Deactivate and reactivate LVM
@@ -99,7 +103,7 @@ test_lvm_deactivate_activate() {
         log_pass "Successfully deactivated LVM"
     else
         log_fail "Failed to deactivate LVM"
-        return 1
+        return "$FAILURE"
     fi
     
     # Verify it's inactive
@@ -107,7 +111,7 @@ test_lvm_deactivate_activate() {
         log_pass "LVM is inactive"
     else
         log_fail "LVM is still active after deactivation"
-        return 1
+        return "$FAILURE"
     fi
     
     # Reactivate
@@ -115,7 +119,7 @@ test_lvm_deactivate_activate() {
         log_pass "Successfully reactivated LVM"
     else
         log_fail "Failed to reactivate LVM"
-        return 1
+        return "$FAILURE"
     fi
     
     # Verify it's active
@@ -123,8 +127,10 @@ test_lvm_deactivate_activate() {
         log_pass "LVM is active after reactivation"
     else
         log_fail "LVM is not active after reactivation"
-        return 1
+        return "$FAILURE"
     fi
+    
+    return "$SUCCESS"
 }
 
 # Test 4: Double deactivation handling
@@ -139,11 +145,13 @@ test_lvm_double_deactivate() {
         log_pass "Double deactivation handled gracefully"
     else
         log_fail "Double deactivation returned error"
-        return 1
+        return "$FAILURE"
     fi
     
     # Reactivate for subsequent tests
     activate_lvm "$TEST_LV_NAME" "$TEST_VG_NAME" &>/dev/null
+    
+    return "$SUCCESS"
 }
 
 # Test 5: Verify nonexistent VG/LV
@@ -152,10 +160,12 @@ test_lvm_verify_nonexistent() {
     
     if verify_lvm "nonexistent_lv" "nonexistent_vg" 2>/dev/null; then
         log_fail "verify_lvm succeeded for nonexistent volume (should fail)"
-        return 1
+        return "$FAILURE"
     else
         log_pass "verify_lvm correctly failed for nonexistent volume"
     fi
+    
+    return "$SUCCESS"
 }
 
 # Run all tests
