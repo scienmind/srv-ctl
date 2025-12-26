@@ -3,29 +3,28 @@
 
 set -euo pipefail
 
+# Debug mode - set TEST_DEBUG=1 to enable verbose output
+DEBUG="${TEST_DEBUG:-0}"
+debug() { [[ "$DEBUG" == "1" ]] && echo "DEBUG: $*" >&2 || true; }
+
 # Trap errors to show what failed
 trap 'echo "ERROR: Command failed at line $LINENO: $BASH_COMMAND" >&2' ERR
 
 # Load test environment
-echo "DEBUG: Loading test environment from /tmp/test_env.conf" >&2
+debug "Loading test environment from /tmp/test_env.conf"
 if [[ ! -f /tmp/test_env.conf ]]; then
     echo "ERROR: Test environment not setup. Run setup-test-env.sh first."
     exit 1
 fi
 source /tmp/test_env.conf
-echo "DEBUG: Test environment loaded" >&2
 
 # Load libraries
-echo "DEBUG: Setting up constants" >&2
 export SUCCESS=0
 export FAILURE=1
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-echo "DEBUG: SCRIPT_DIR=$SCRIPT_DIR" >&2
-echo "DEBUG: Loading lib/os-utils.sh" >&2
 source "$SCRIPT_DIR/../../lib/os-utils.sh"
-echo "DEBUG: Loading lib/storage.sh" >&2
 source "$SCRIPT_DIR/../../lib/storage.sh"
-echo "DEBUG: Libraries loaded successfully" >&2
+debug "Libraries loaded successfully"
 
 # Test counters
 TESTS_RUN=0
@@ -63,7 +62,7 @@ run_test() {
 
 # Test 1: Close and reopen LUKS container
 test_luks_lock_unlock() {
-    echo "DEBUG: Inside test_luks_lock_unlock" >&2
+    debug "Inside test_luks_lock_unlock"
     run_test "LUKS lock and unlock"
     
     # Deactivate LVM first (LUKS can't be closed while in use)
@@ -83,7 +82,7 @@ test_luks_lock_unlock() {
     sleep 1
     udevadm settle
     
-    echo "DEBUG: About to call lock_device" >&2
+    debug "About to call lock_device"
     if lock_device "$TEST_LUKS_MAPPER" "luks"; then
         log_pass "Successfully closed LUKS container"
     else
@@ -205,22 +204,9 @@ main() {
     echo "========================================="
     echo ""
     
-    echo "DEBUG: Checking if test functions exist" >&2
-    type test_luks_lock_unlock >&2 || echo "ERROR: test_luks_lock_unlock not defined" >&2
-    type test_luks_wrong_password >&2 || echo "ERROR: test_luks_wrong_password not defined" >&2
-    type test_luks_double_close >&2 || echo "ERROR: test_luks_double_close not defined" >&2
-    
-    echo "DEBUG: Starting test_luks_lock_unlock" >&2
-    test_luks_lock_unlock || echo "DEBUG: test_luks_lock_unlock returned $?" >&2
-    echo "DEBUG: Completed test_luks_lock_unlock" >&2
-    
-    echo "DEBUG: Starting test_luks_wrong_password" >&2
-    test_luks_wrong_password || echo "DEBUG: test_luks_wrong_password returned $?" >&2
-    echo "DEBUG: Completed test_luks_wrong_password" >&2
-    
-    echo "DEBUG: Starting test_luks_double_close" >&2
-    test_luks_double_close || echo "DEBUG: test_luks_double_close returned $?" >&2
-    echo "DEBUG: Completed test_luks_double_close" >&2
+    test_luks_lock_unlock || true
+    test_luks_wrong_password || true
+    test_luks_double_close || true
     
     echo ""
     echo "========================================="

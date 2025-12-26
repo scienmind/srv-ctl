@@ -87,15 +87,23 @@ tests/
 
 Tests run automatically in GitHub Actions:
 
-**Fast CI** (`.github/workflows/test.yml`):
-- Runs on: Push to main/develop, pull requests
-- Matrix: 8 OS versions (Debian 10-13, Ubuntu 18.04-24.04)
-- Uses: Docker containers
+**Lint** (`.github/workflows/lint.yml`):
+- Runs on: Push to main, pull requests
+- Checks: ShellCheck, bash syntax validation
 
-**Full VM CI** (`.github/workflows/vm-tests.yml`):
-- Runs on: Weekly schedule, manual trigger
-- Matrix: 4 OS versions (Ubuntu 22.04/24.04, Debian 11/12)
-- Uses: QEMU VMs with complete system validation
+**Unit Tests** (`.github/workflows/test-unit.yml`):
+- Runs on: Push to main, pull requests
+- Uses: bats framework
+
+**Docker Integration** (`.github/workflows/test-integration-docker.yml`):
+- Runs on: Push to main, pull requests
+- Matrix: 5 OS versions (Debian 11/12/13, Ubuntu 22.04/24.04)
+- Uses: Privileged Docker containers
+
+**VM Integration** (`.github/workflows/test-integration-vm.yml`):
+- Runs on: Push to main, pull requests
+- Matrix: 5 OS versions (Debian 11/12/13, Ubuntu 22.04/24.04)
+- Uses: QEMU VMs with cloud-init
 
 ## Writing Tests
 
@@ -181,7 +189,7 @@ which qemu-system-x86_64
 
 ## Coverage
 
-- **22 unit tests**: Function-level testing
-- **7 e2e tests**: High-level workflow testing  
-- **13 integration tests**: System-level operations
-- **Total**: 42 automated tests across 8 OS platforms
+- **Unit tests**: Function-level testing with bats
+- **E2E tests**: High-level workflow validation
+- **Integration tests**: LUKS, LVM, and mount operations
+- **Platforms**: Debian 11/12/13, Ubuntu 22.04/24.04

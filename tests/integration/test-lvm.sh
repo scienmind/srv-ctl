@@ -3,29 +3,28 @@
 
 set -euo pipefail
 
+# Debug mode - set TEST_DEBUG=1 to enable verbose output
+DEBUG="${TEST_DEBUG:-0}"
+debug() { [[ "$DEBUG" == "1" ]] && echo "DEBUG: $*" >&2 || true; }
+
 # Trap errors to show what failed
 trap 'echo "ERROR: Command failed at line $LINENO: $BASH_COMMAND" >&2' ERR
 
 # Load test environment
-echo "DEBUG: Loading test environment from /tmp/test_env.conf" >&2
+debug "Loading test environment from /tmp/test_env.conf"
 if [[ ! -f /tmp/test_env.conf ]]; then
     echo "ERROR: Test environment not setup. Run setup-test-env.sh first."
     exit 1
 fi
 source /tmp/test_env.conf
-echo "DEBUG: Test environment loaded" >&2
 
 # Load libraries
-echo "DEBUG: Setting up constants" >&2
 export SUCCESS=0
 export FAILURE=1
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-echo "DEBUG: SCRIPT_DIR=$SCRIPT_DIR" >&2
-echo "DEBUG: Loading lib/os-utils.sh" >&2
 source "$SCRIPT_DIR/../../lib/os-utils.sh"
-echo "DEBUG: Loading lib/storage.sh" >&2
 source "$SCRIPT_DIR/../../lib/storage.sh"
-echo "DEBUG: Libraries loaded successfully" >&2
+debug "Libraries loaded successfully"
 
 # Test counters
 TESTS_RUN=0
@@ -160,16 +159,17 @@ main() {
     echo "========================================="
     echo ""
     
-    echo "DEBUG: Starting test_lvm_verify" >&2
-    test_lvm_verify || echo "DEBUG: test_lvm_verify returned $?" >&2
-    echo "DEBUG: Starting test_lvm_is_active" >&2
-    test_lvm_is_active || echo "DEBUG: test_lvm_is_active returned $?" >&2
-    echo "DEBUG: Starting test_lvm_deactivate_activate" >&2
-    test_lvm_deactivate_activate || echo "DEBUG: test_lvm_deactivate_activate returned $?" >&2
-    echo "DEBUG: Starting test_lvm_double_deactivate" >&2
-    test_lvm_double_deactivate || echo "DEBUG: test_lvm_double_deactivate returned $?" >&2
-    echo "DEBUG: Starting test_lvm_verify_nonexistent" >&2
-    test_lvm_verify_nonexistent || echo "DEBUG: test_lvm_verify_nonexistent returned $?" >&2
+    test_lvm_verify || true
+    test_lvm_is_active || true
+    test_lvm_deactivate_activate || true
+    test_lvm_double_deactivate || true
+    test_lvm_verify_nonexistent || true
+    
+    echo ""
+    echo "========================================="
+    echo "Test Results"
+    echo "========================================="
+    echo "Tests run:    $TESTS_RUN"
     echo "Tests passed: $TESTS_PASSED"
     echo "Tests failed: $TESTS_FAILED"
     echo ""

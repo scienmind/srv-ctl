@@ -3,29 +3,28 @@
 
 set -euo pipefail
 
+# Debug mode - set TEST_DEBUG=1 to enable verbose output
+DEBUG="${TEST_DEBUG:-0}"
+debug() { [[ "$DEBUG" == "1" ]] && echo "DEBUG: $*" >&2 || true; }
+
 # Trap errors to show what failed
 trap 'echo "ERROR: Command failed at line $LINENO: $BASH_COMMAND" >&2' ERR
 
 # Load test environment
-echo "DEBUG: Loading test environment from /tmp/test_env.conf" >&2
+debug "Loading test environment from /tmp/test_env.conf"
 if [[ ! -f /tmp/test_env.conf ]]; then
     echo "ERROR: Test environment not setup. Run setup-test-env.sh first."
     exit 1
 fi
 source /tmp/test_env.conf
-echo "DEBUG: Test environment loaded" >&2
 
 # Load libraries
-echo "DEBUG: Setting up constants" >&2
 export SUCCESS=0
 export FAILURE=1
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-echo "DEBUG: SCRIPT_DIR=$SCRIPT_DIR" >&2
-echo "DEBUG: Loading lib/os-utils.sh" >&2
 source "$SCRIPT_DIR/../../lib/os-utils.sh"
-echo "DEBUG: Loading lib/storage.sh" >&2
 source "$SCRIPT_DIR/../../lib/storage.sh"
-echo "DEBUG: Libraries loaded successfully" >&2
+debug "Libraries loaded successfully"
 
 # Test counters
 TESTS_RUN=0
@@ -206,16 +205,11 @@ main() {
     echo "========================================="
     echo ""
     
-    echo "DEBUG: Starting test_mount_unmount" >&2
-    test_mount_unmount || echo "DEBUG: test_mount_unmount returned $?" >&2
-    echo "DEBUG: Starting test_mount_write_read" >&2
-    test_mount_write_read || echo "DEBUG: test_mount_write_read returned $?" >&2
-    echo "DEBUG: Starting test_double_mount" >&2
-    test_double_mount || echo "DEBUG: test_double_mount returned $?" >&2
-    echo "DEBUG: Starting test_double_unmount" >&2
-    test_double_unmount || echo "DEBUG: test_double_unmount returned $?" >&2
-    echo "DEBUG: Starting test_mount_none_device" >&2
-    test_mount_none_device || echo "DEBUG: test_mount_none_device returned $?" >&2
+    test_mount_unmount || true
+    test_mount_write_read || true
+    test_double_mount || true
+    test_double_unmount || true
+    test_mount_none_device || true
     
     echo ""
     echo "========================================="
