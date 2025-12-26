@@ -195,6 +195,103 @@ test_config_structure() {
     fi
 }
 
+# Test 8: Invalid command handling
+test_invalid_command() {
+    run_test "Invalid command handling"
+    
+    local output
+    output=$(bash "$PROJECT_ROOT/srv-ctl.sh" invalid-command 2>&1) || true
+    
+    # Accept either usage message or root requirement (root check happens first for action commands)
+    if echo "$output" | grep -qi "usage\|unknown\|invalid\|root"; then
+        log_pass "Invalid command shows error message"
+    else
+        log_fail "Invalid command not handled properly"
+        echo "Output was: $output"
+        return 1
+    fi
+}
+
+# Test 9: Config with enabled device shows correct count
+test_enabled_device_count() {
+    run_test "Config with enabled device shows correct count"
+    
+    # Create a temporary config with one device enabled (fake UUID)
+    local temp_config="$PROJECT_ROOT/config.local"
+    
+    # Modify config to enable one device
+    sed -i 's/PRIMARY_DATA_UUID="none"/PRIMARY_DATA_UUID="12345678-fake-uuid-test"/' "$temp_config"
+    
+    local output
+    output=$(bash "$PROJECT_ROOT/srv-ctl.sh" validate-config 2>&1)
+    
+    # Restore to disabled
+    sed -i 's/PRIMARY_DATA_UUID="12345678-fake-uuid-test"/PRIMARY_DATA_UUID="none"/' "$temp_config"
+    
+    if echo "$output" | grep -q "1 devices enabled\|1 device enabled"; then
+        log_pass "Enabled device count correctly shown"
+    else
+        log_fail "Device count incorrect"
+        echo "Output was: $output"
+        return 1
+    fi
+}
+
+# Test 10: Invalid encryption type detection
+test_invalid_encryption_type() {
+    run_test "Invalid encryption type detection"
+    
+    local temp_config="$PROJECT_ROOT/config.local"
+    
+    # Enable a device with invalid encryption type
+    sed -i 's/PRIMARY_DATA_UUID="none"/PRIMARY_DATA_UUID="12345678-fake-uuid-test"/' "$temp_config"
+    sed -i 's/PRIMARY_DATA_ENCRYPTION_TYPE="luks"/PRIMARY_DATA_ENCRYPTION_TYPE="invalid_type"/' "$temp_config"
+    
+    local output
+    output=$(bash "$PROJECT_ROOT/srv-ctl.sh" validate-config 2>&1) || true
+    local exit_code=$?
+    
+    # Restore config
+    sed -i 's/PRIMARY_DATA_UUID="12345678-fake-uuid-test"/PRIMARY_DATA_UUID="none"/' "$temp_config"
+    sed -i 's/PRIMARY_DATA_ENCRYPTION_TYPE="invalid_type"/PRIMARY_DATA_ENCRYPTION_TYPE="luks"/' "$temp_config"
+    
+    if [ $exit_code -ne 0 ] || echo "$output" | grep -qi "invalid\|unsupported\|error"; then
+        log_pass "Invalid encryption type detected"
+    else
+        log_fail "Invalid encryption type not detected"
+        echo "Output was: $output"
+        return 1
+    fi
+}
+
+# Test 11: No arguments shows usage
+test_no_arguments() {
+    run_test "No arguments shows usage"
+    
+    local output
+    output=$(bash "$PROJECT_ROOT/srv-ctl.sh" 2>&1) || true
+    
+    if echo "$output" | grep -qi "usage"; then
+        log_pass "No arguments shows usage"
+    else
+        log_fail "No arguments did not show usage"
+        echo "Output was: $output"
+        return 1
+    fi
+}
+
+# Test 12: Script is executable
+test_script_executable() {
+    run_test "Script is executable"
+    
+    if [ -x "$PROJECT_ROOT/srv-ctl.sh" ]; then
+        log_pass "srv-ctl.sh is executable"
+    else
+        log_fail "srv-ctl.sh is not executable"
+        return 1
+    fi
+}
+
 # Main
 main() {
     echo "========================================="
@@ -211,6 +308,11 @@ main() {
     test_root_check
     test_all_disabled_config
     test_config_structure
+    test_invalid_command
+    test_enabled_device_count
+    test_invalid_encryption_type
+    test_no_arguments
+    test_script_executable
     
     # Restore original config
     restore_config
