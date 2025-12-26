@@ -511,19 +511,23 @@ function main() {
 
     local l_action="$1"
 
-    # Handle commands that don't need root privileges
+    # Handle commands that don't need root privileges or requirements check
     case "$l_action" in
     validate-config)
         validate_config
         return $?
         ;;
-    help)
+    help|-h)
         show_usage
         exit "$SUCCESS"
         ;;
-    -h)
+    start|stop|unlock-only|stop-services-only)
+        # Valid commands that need root and requirements
+        ;;
+    *)
+        # Invalid command
         show_usage
-        exit "$SUCCESS"
+        exit "$FAILURE"
         ;;
     esac
 
@@ -542,10 +546,6 @@ function main() {
         ;;
     stop-services-only)
         stop_all_services
-        ;;
-    *)
-        show_usage
-        exit "$FAILURE"
         ;;
     esac
 }
