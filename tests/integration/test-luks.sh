@@ -72,17 +72,8 @@ test_luks_lock_unlock() {
     run_test "LUKS lock and unlock"
     
     # Deactivate LVM first (LUKS can't be closed while in use)
-    if lvchange -an "$TEST_VG_NAME/$TEST_LV_NAME" 2>/dev/null; then
-        log_pass "Deactivated LVM logical volume"
-    else
-        log_warn "LVM already inactive or deactivation failed"
-    fi
-    
-    if vgchange -an "$TEST_VG_NAME" 2>/dev/null; then
-        log_pass "Deactivated volume group"
-    else
-        log_warn "VG already inactive"
-    fi
+    lvchange -an "$TEST_VG_NAME/$TEST_LV_NAME" 2>/dev/null && log_pass "Deactivated LVM logical volume" || log_warn "LVM already inactive or deactivation failed"
+    vgchange -an "$TEST_VG_NAME" 2>/dev/null && log_pass "Deactivated volume group" || log_warn "VG already inactive"
     
     # Wait for device to be released
     sleep 1
@@ -121,17 +112,8 @@ test_luks_lock_unlock() {
     fi
     
     # Reactivate LVM for subsequent tests
-    if vgchange -ay "$TEST_VG_NAME" 2>/dev/null; then
-        log_pass "Reactivated volume group"
-    else
-        log_warn "Failed to reactivate VG"
-    fi
-    
-    if lvchange -ay "$TEST_VG_NAME/$TEST_LV_NAME" 2>/dev/null; then
-        log_pass "Reactivated LVM after reopening LUKS"
-    else
-        log_warn "Failed to reactivate LVM"
-    fi
+    vgchange -ay "$TEST_VG_NAME" 2>/dev/null && log_pass "Reactivated volume group" || log_warn "Failed to reactivate VG"
+    lvchange -ay "$TEST_VG_NAME/$TEST_LV_NAME" 2>/dev/null && log_pass "Reactivated LVM after reopening LUKS" || log_warn "Failed to reactivate LVM"
     
     return "$SUCCESS"
 }
@@ -141,17 +123,8 @@ test_luks_wrong_password() {
     run_test "LUKS wrong password handling"
     
     # Deactivate LVM completely (LV + VG)
-    if lvchange -an "$TEST_VG_NAME/$TEST_LV_NAME" 2>/dev/null; then
-        log_pass "Deactivated LVM logical volume"
-    else
-        log_warn "Failed to deactivate LVM"
-    fi
-    
-    if vgchange -an "$TEST_VG_NAME" 2>/dev/null; then
-        log_pass "Deactivated volume group"
-    else
-        log_warn "Failed to deactivate VG"
-    fi
+    lvchange -an "$TEST_VG_NAME/$TEST_LV_NAME" 2>/dev/null && log_pass "Deactivated LVM logical volume" || log_warn "Failed to deactivate LVM"
+    vgchange -an "$TEST_VG_NAME" 2>/dev/null && log_pass "Deactivated volume group" || log_warn "Failed to deactivate VG"
     
     # Wait for device to be released
     sleep 1
