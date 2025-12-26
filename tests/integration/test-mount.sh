@@ -59,11 +59,11 @@ run_test() {
 }
 
 pass_test() {
-    ((TESTS_PASSED++))
+    ((TESTS_PASSED++)) || true
 }
 
 fail_test() {
-    ((TESTS_FAILED++))
+    ((TESTS_FAILED++)) || true
 }
 
 # Test 1: Mount and unmount device
