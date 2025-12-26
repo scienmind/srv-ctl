@@ -87,14 +87,14 @@ function open_device() {
     # Check if device is configured - UUID is the primary enable/disable flag
     if [ "$l_uuid" == "none" ]; then
         echo -e "Device not configured (uuid=\"none\"). Skipping.\n"
-        return $SUCCESS
+        return "$SUCCESS"
     fi
 
     # Validate that mapper and mount are also configured
     if [ "$l_mapper" == "none" ] || [ "$l_mount" == "none" ]; then
         echo "ERROR: Device UUID is set but mapper or mount point is 'none'"
         echo "       UUID: $l_uuid, MAPPER: $l_mapper, MOUNT: $l_mount"
-        return $FAILURE
+        return "$FAILURE"
     fi
 
     # Build mount options from username/groupname
@@ -102,17 +102,17 @@ function open_device() {
     l_mount_options=$(build_mount_options "$l_owner_user" "$l_owner_group" "$l_additional_options")
     if [ $? -ne $SUCCESS ]; then
         echo "$l_mount_options"  # Print error message
-        return $FAILURE
+        return "$FAILURE"
     fi
 
     # Step 1: Activate LVM (if configured)
-    activate_lvm "$l_lvm_name" "$l_lvm_group" || return $FAILURE
+    activate_lvm "$l_lvm_name" "$l_lvm_group" || return "$FAILURE"
 
     # Step 2: Unlock encrypted device  
-    unlock_device "$l_uuid" "$l_mapper" "$l_key_file" "$l_encryption_type" || return $FAILURE
+    unlock_device "$l_uuid" "$l_mapper" "$l_key_file" "$l_encryption_type" || return "$FAILURE"
 
     # Step 3: Mount device
-    mount_device "$l_mapper" "$l_mount" "$l_mount_options" || return $FAILURE
+    mount_device "$l_mapper" "$l_mount" "$l_mount_options" || return "$FAILURE"
 }
 
 function close_device() {
@@ -125,7 +125,7 @@ function close_device() {
     # Check if any component is configured before attempting cleanup
     # Use mapper as the check since it's required for both lock and unmount
     if [ "$l_mapper" == "none" ] && [ "$l_mount" == "none" ]; then
-        return $SUCCESS
+        return "$SUCCESS"
     fi
 
     # Continue cleanup even if individual steps fail
@@ -203,17 +203,17 @@ function start_all_services() {
         echo "Reloading systemd units..."
         if ! systemctl daemon-reload; then
             echo "ERROR: Failed to reload systemd units"
-            return $FAILURE
+            return "$FAILURE"
         fi
         echo -e "Done\n"
     else
         echo -e "No services managed. Skipping.\n"
-        return $SUCCESS
+        return "$SUCCESS"
     fi
 
-    start_service "$ST_SERVICE_1"
-    start_service "$ST_SERVICE_2"
-    start_service "$DOCKER_SERVICE"
+    start_service "$ST_SERVICE_1" || return "$FAILURE"
+    start_service "$ST_SERVICE_2" || return "$FAILURE"
+    start_service "$DOCKER_SERVICE" || return "$FAILURE"
 }
 
 function stop_all_services() {
@@ -249,19 +249,14 @@ function system_off() {
 
 function init_globals() {
     local l_config_file_name=$1
-    local l_script_dir
-    l_script_dir="$(
-        cd "$(dirname "${BASH_SOURCE[0]}")"
-        pwd
-    )"
-    local l_config_file="${l_script_dir}/${l_config_file_name}"
+    local l_config_file="${SCRIPT_DIR}/${l_config_file_name}"
 
     if [ -f "$l_config_file" ]; then
         # shellcheck disable=SC1090  # Dynamic config file sourcing
         source "$l_config_file"
     else
         echo "ERROR: Configuration file \"$l_config_file_name\" is missing."
-        return $FAILURE
+        return "$FAILURE"
     fi
 }
 
@@ -272,21 +267,21 @@ function validate_encryption_type() {
     if [ "$l_encryption_type" != "luks" ] && [ "$l_encryption_type" != "bitlocker" ]; then
         echo "ERROR: Unknown encryption type \"$l_encryption_type\" for device \"$l_device_name\""
         echo "       Supported types: luks, bitlocker"
-        return $FAILURE
+        return "$FAILURE"
     fi
     
-    return $SUCCESS
+    return "$SUCCESS"
 }
 
 function verify_requirements() {
     if [ "$EUID" -ne "0" ]; then
         echo "ERROR: Please run as root"
-        return $FAILURE
+        return "$FAILURE"
     fi
 
     if ! command -v cryptsetup &>/dev/null; then
         echo "ERROR: 'cryptsetup' utility is not available"
-        return $FAILURE
+        return "$FAILURE"
     fi
 
     # Check for LVM utilities if needed
@@ -297,18 +292,18 @@ function verify_requirements() {
        [ "${PRIMARY_DATA_LVM_NAME:-none}" != "none" ]; then
         if ! command -v lvdisplay &>/dev/null; then
             echo "ERROR: 'lvm2' utility is not available"
-            return $FAILURE
+            return "$FAILURE"
         fi
     fi
 
     # Validate service configuration
     if [ "${ST_USER_1:-none}" != "none" ] && [ -z "${ST_SERVICE_1:-}" ]; then
         echo "ERROR: ST_USER_1 is set but ST_SERVICE_1 is empty"
-        return $FAILURE
+        return "$FAILURE"
     fi
     if [ "${ST_USER_2:-none}" != "none" ] && [ -z "${ST_SERVICE_2:-}" ]; then
         echo "ERROR: ST_USER_2 is set but ST_SERVICE_2 is empty"
-        return $FAILURE
+        return "$FAILURE"
     fi
 
     # Validate encryption types for all configured devices
@@ -324,7 +319,7 @@ function verify_requirements() {
         IFS=':' read -r device_name encryption_type device_uuid <<< "$device_info"
         # Only validate encryption type for enabled devices
         if [ "$device_uuid" != "none" ]; then
-            validate_encryption_type "$encryption_type" "$device_name" || return $FAILURE
+            validate_encryption_type "$encryption_type" "$device_name" || return "$FAILURE"
         fi
     done
 
@@ -338,7 +333,7 @@ function verify_requirements() {
     if [ "$l_version_check" != "$CRYPTSETUP_MIN_VERSION" ]; then
         echo "ERROR: cryptsetup version $CRYPTSETUP_MIN_VERSION or newer is required (current: $l_cryptsetup_version_current)"
         echo "       Version $CRYPTSETUP_MIN_VERSION+ is needed for full LUKS and BitLocker support"
-        return $FAILURE
+        return "$FAILURE"
     fi
 }
 
@@ -358,7 +353,7 @@ function validate_config() {
     # Check config file exists
     if [ ! -f "${l_script_dir}/config.local" ]; then
         echo "❌ config.local not found (copy config.local.template and customize)"
-        return $FAILURE
+        return "$FAILURE"
     fi
     echo "✅ config.local found"
     
@@ -408,10 +403,10 @@ function validate_config() {
     echo ""
     if [ "$errors" -eq 0 ]; then
         echo "🎉 Validation PASSED ($enabled devices enabled)"
-        return $SUCCESS
+        return "$SUCCESS"
     else
         echo "❌ Validation FAILED ($errors errors)"
-        return $FAILURE
+        return "$FAILURE"
     fi
 }
 
@@ -421,14 +416,14 @@ function _validate_service() {
     if [ "$user" != "none" ]; then
         if [ -z "$service" ]; then
             echo "❌ $name: user '$user' set but service empty"
-            return $FAILURE
+            return "$FAILURE"
         else
             echo "✅ $name: $service (user: $user)"
         fi
     else
         echo "ℹ️  $name: disabled"
     fi
-    return $SUCCESS
+    return "$SUCCESS"
 }
 
 function _validate_simple_service() {
@@ -438,7 +433,7 @@ function _validate_simple_service() {
     else
         echo "ℹ️  $name: disabled"
     fi
-    return $SUCCESS
+    return "$SUCCESS"
 }
 
 function _validate_device() {
@@ -478,10 +473,10 @@ function _validate_device() {
     
     if [ "$has_errors" = true ]; then
         echo "❌ $label: $error_details"
-        return $FAILURE
+        return "$FAILURE"
     else
         echo "✅ $label: $encryption$key_status"
-        return $SUCCESS
+        return "$SUCCESS"
     fi
 }
 
@@ -492,16 +487,16 @@ function _validate_network_share() {
     
     if [ "$protocol" = "none" ]; then
         echo "ℹ️  disabled"
-        return $SUCCESS
+        return "$SUCCESS"
     fi
     
     if [ "$credentials" != "none" ] && [ ! -f "$credentials" ]; then
         echo "❌ enabled but credentials file not found: $credentials"
-        return $FAILURE
+        return "$FAILURE"
     fi
     
     echo "✅ enabled ($protocol: $address)"
-    return $SUCCESS
+    return "$SUCCESS"
 }
 
 # -----------------------------------------------------------------------------
@@ -511,7 +506,7 @@ function _validate_network_share() {
 function main() {
     if [ "$#" -ne 1 ]; then
         show_usage
-        exit $FAILURE
+        exit "$FAILURE"
     fi
 
     local l_action="$1"
@@ -524,11 +519,11 @@ function main() {
         ;;
     help)
         show_usage
-        exit $SUCCESS
+        exit "$SUCCESS"
         ;;
     -h)
         show_usage
-        exit $SUCCESS
+        exit "$SUCCESS"
         ;;
     esac
 
@@ -550,7 +545,7 @@ function main() {
         ;;
     *)
         show_usage
-        exit $FAILURE
+        exit "$FAILURE"
         ;;
     esac
 }
