@@ -68,18 +68,6 @@ function show_usage() {
 }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 # -----------------------------------------------------------------------------
 # Device Orchestration (combines library primitives)
 # -----------------------------------------------------------------------------
@@ -498,10 +486,11 @@ function _validate_device() {
 }
 
 function _validate_network_share() {
+    local protocol="${NETWORK_SHARE_PROTOCOL:-none}"
     local address="${NETWORK_SHARE_ADDRESS:-none}"
     local credentials="${NETWORK_SHARE_CREDENTIALS:-none}"
     
-    if [ "$address" = "none" ]; then
+    if [ "$protocol" = "none" ]; then
         echo "ℹ️  disabled"
         return $SUCCESS
     fi
@@ -511,7 +500,7 @@ function _validate_network_share() {
         return $FAILURE
     fi
     
-    echo "✅ enabled ($address)"
+    echo "✅ enabled ($protocol: $address)"
     return $SUCCESS
 }
 

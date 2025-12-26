@@ -10,17 +10,20 @@
 ./tests/docker/run-docker-tests.sh
 
 # VM tests (full system validation) - CI only, multi-OS
-./tests/vm/run-vm-tests.sh ubuntu-22.04
+./tests/vm/run-vm-tests.sh <os-name>
 ```
 
 ## Test Levels
 
-### Local Tests ✅ SAFE
-- **What**: Syntax checks, unit tests (bats), e2e tests
-- **Requirements**: `bats`, `shellcheck`
-- **Time**: ~30 seconds
-- **Root**: Not required
-- **Safe**: No system modifications
+| Level | Safety | Root | Isolation | Use Case |
+|-------|--------|------|-----------|----------|
+| **Local** | ✅ Safe | No | None needed | Quick development feedback |
+| **Docker** | ✅ Safe | No | Container | Integration with LUKS/LVM/mounts |
+| **VM** | ✅ Safe | No | Full VM | Multi-OS validation, systemd |
+
+### Local Tests
+
+Syntax checks, unit tests (bats), and e2e tests. Fast feedback loop for development.
 
 ```bash
 ./tests/run-tests.sh              # All local tests
@@ -29,82 +32,39 @@
 ./tests/run-tests.sh --e2e-only
 ```
 
-### Docker Tests ✅ SAFE (Recommended)
-- **What**: All local tests + integration tests (LUKS, LVM, mounting)
-- **Requirements**: Docker
-- **Time**: ~2-3 minutes
-- **Root**: Not required (Docker handles isolation)
-- **Safe**: Complete isolation, no host impact
+**Requirements**: `bats`, `shellcheck`
+
+### Docker Tests (Recommended)
+
+All local tests plus integration tests requiring privileged operations (LUKS, LVM, mounting).
 
 ```bash
 ./tests/docker/run-docker-tests.sh           # All tests
-./tests/docker/run-docker-tests.sh --rebuild # Force rebuild
+./tests/docker/run-docker-tests.sh --rebuild # Force image rebuild
 ```
 
-### VM Tests ✅ SAFE (CI Primary)
-- **What**: Complete validation with systemd, network shares, multi-OS
-- **Requirements**: QEMU/KVM
-- **Time**: ~5-10 minutes per OS
-- **Root**: Not required
-- **Safe**: Full VM isolation
+**Requirements**: Docker
+
+### VM Tests (CI Primary)
+
+Complete validation with real systemd, network shares, and multi-OS support.
 
 ```bash
-# Tested OS versions (same as CI matrix)
-./tests/vm/run-vm-tests.sh ubuntu-22.04
-./tests/vm/run-vm-tests.sh ubuntu-24.04
-./tests/vm/run-vm-tests.sh debian-11
-./tests/vm/run-vm-tests.sh debian-12
-./tests/vm/run-vm-tests.sh debian-13
+./tests/vm/run-vm-tests.sh <os-name>  # See tests/vm/ for available OS images
 ```
 
-## Structure
-
-```text
-tests/
-├── run-tests.sh                    # Main local test runner
-├── unit/                           # Unit tests (bats)
-│   ├── test-os-utils.bats
-│   └── test-storage.bats
-├── e2e/                            # End-to-end tests
-│   └── test-e2e.sh
-├── integration/                    # Integration tests (root required)
-│   ├── test-luks.sh
-│   ├── test-lvm.sh
-│   └── test-mount.sh
-├── fixtures/                       # Test infrastructure
-│   ├── config.local.test          # Safe test configuration
-│   ├── setup-test-env.sh
-│   └── cleanup-test-env.sh
-├── docker/                         # Docker testing
-│   ├── Dockerfile
-│   └── run-docker-tests.sh
-└── vm/                             # VM testing
-    ├── run-vm-tests.sh
-    ├── download-image.sh
-    └── cleanup.sh
-```
+**Requirements**: QEMU/KVM
 
 ## CI/CD
 
-Tests run automatically in GitHub Actions:
+Tests run automatically via GitHub Actions on push to main and pull requests:
 
-**Lint** (`.github/workflows/lint.yml`):
-- Runs on: Push to main, pull requests
-- Checks: ShellCheck, bash syntax validation
+- **Lint**: ShellCheck and bash syntax validation
+- **Unit Tests**: bats framework
+- **Docker Integration**: Privileged containers across multiple OS versions
+- **VM Integration**: QEMU VMs with cloud-init across multiple OS versions
 
-**Unit Tests** (`.github/workflows/test-unit.yml`):
-- Runs on: Push to main, pull requests
-- Uses: bats framework
-
-**Docker Integration** (`.github/workflows/test-integration-docker.yml`):
-- Runs on: Push to main, pull requests
-- Matrix: 5 OS versions (Debian 11/12/13, Ubuntu 22.04/24.04)
-- Uses: Privileged Docker containers
-
-**VM Integration** (`.github/workflows/test-integration-vm.yml`):
-- Runs on: Push to main, pull requests
-- Matrix: 5 OS versions (Debian 11/12/13, Ubuntu 22.04/24.04)
-- Uses: QEMU VMs with cloud-init
+See `.github/workflows/` for workflow definitions and the current OS matrix.
 
 ## Writing Tests
 
@@ -182,15 +142,23 @@ docker info
 
 ```bash
 # Download OS image
-./tests/vm/download-image.sh ubuntu-22.04
+./tests/vm/download-image.sh <os-name>
 
 # Check QEMU/KVM
 which qemu-system-x86_64
 ```
 
-## Coverage
+## Project Structure
 
-- **Unit tests**: Function-level testing with bats
-- **E2E tests**: High-level workflow validation
-- **Integration tests**: LUKS, LVM, and mount operations
-- **Platforms**: Debian 11/12/13, Ubuntu 22.04/24.04
+```text
+tests/
+├── run-tests.sh          # Main local test runner
+├── unit/                 # Unit tests (bats)
+├── e2e/                  # End-to-end tests  
+├── integration/          # Integration tests (Docker/VM only)
+├── fixtures/             # Test configs and helpers
+├── docker/               # Docker test infrastructure
+└── vm/                   # VM test infrastructure
+```
+
+Run `tree tests/` or `find tests/ -type f` for the complete file listing.
