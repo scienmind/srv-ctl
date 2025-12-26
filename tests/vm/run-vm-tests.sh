@@ -52,7 +52,8 @@ create_cloud_init() {
     if [[ ! -f "$ssh_key" ]]; then
         ssh-keygen -t rsa -b 2048 -f "$ssh_key" -N "" -C "srv-ctl-test" &>/dev/null
     fi
-    local ssh_pub_key=$(cat "$ssh_key.pub")
+    local ssh_pub_key
+    ssh_pub_key=$(cat "$ssh_key.pub")
     
     cat > "$work_dir/user-data" << EOF
 #cloud-config
@@ -60,8 +61,7 @@ users:
   - name: testuser
     sudo: ALL=(ALL) NOPASSWD:ALL
     shell: /bin/bash
-    lock_passwd: false
-    passwd: \$6\$rounds=4096\$saltsalt\$IjY1f3qKzVqKqfH5XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+    lock_passwd: true
     ssh_authorized_keys:
       - $ssh_pub_key
 
