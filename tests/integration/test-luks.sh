@@ -43,12 +43,10 @@ log_test() {
 
 log_pass() {
     echo -e "${GREEN}[PASS]${NC} $*"
-    ((TESTS_PASSED++))
 }
 
 log_fail() {
     echo -e "${RED}[FAIL]${NC} $*"
-    ((TESTS_FAILED++))
 }
 
 log_warn() {
@@ -58,6 +56,14 @@ log_warn() {
 run_test() {
     ((TESTS_RUN++))
     log_test "$1"
+}
+
+pass_test() {
+    ((TESTS_PASSED++))
+}
+
+fail_test() {
+    ((TESTS_FAILED++))
 }
 
 # Test 1: Close and reopen LUKS container
@@ -204,9 +210,23 @@ main() {
     echo "========================================="
     echo ""
     
-    test_luks_lock_unlock || true
-    test_luks_wrong_password || true
-    test_luks_double_close || true
+    if test_luks_lock_unlock; then
+        pass_test
+    else
+        fail_test
+    fi
+    
+    if test_luks_wrong_password; then
+        pass_test
+    else
+        fail_test
+    fi
+    
+    if test_luks_double_close; then
+        pass_test
+    else
+        fail_test
+    fi
     
     echo ""
     echo "========================================="

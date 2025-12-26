@@ -43,12 +43,10 @@ log_test() {
 
 log_pass() {
     echo -e "${GREEN}[PASS]${NC} $*"
-    ((TESTS_PASSED++))
 }
 
 log_fail() {
     echo -e "${RED}[FAIL]${NC} $*"
-    ((TESTS_FAILED++))
 }
 
 log_warn() {
@@ -58,6 +56,14 @@ log_warn() {
 run_test() {
     ((TESTS_RUN++))
     log_test "$1"
+}
+
+pass_test() {
+    ((TESTS_PASSED++))
+}
+
+fail_test() {
+    ((TESTS_FAILED++))
 }
 
 # Test 1: Verify LVM
@@ -159,11 +165,35 @@ main() {
     echo "========================================="
     echo ""
     
-    test_lvm_verify || true
-    test_lvm_is_active || true
-    test_lvm_deactivate_activate || true
-    test_lvm_double_deactivate || true
-    test_lvm_verify_nonexistent || true
+    if test_lvm_verify; then
+        pass_test
+    else
+        fail_test
+    fi
+    
+    if test_lvm_is_active; then
+        pass_test
+    else
+        fail_test
+    fi
+    
+    if test_lvm_deactivate_activate; then
+        pass_test
+    else
+        fail_test
+    fi
+    
+    if test_lvm_double_deactivate; then
+        pass_test
+    else
+        fail_test
+    fi
+    
+    if test_lvm_verify_nonexistent; then
+        pass_test
+    else
+        fail_test
+    fi
     
     echo ""
     echo "========================================="

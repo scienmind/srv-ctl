@@ -49,11 +49,12 @@
 - **Safe**: Full VM isolation
 
 ```bash
-# Tested OS versions
+# Tested OS versions (same as CI matrix)
 ./tests/vm/run-vm-tests.sh ubuntu-22.04
 ./tests/vm/run-vm-tests.sh ubuntu-24.04
 ./tests/vm/run-vm-tests.sh debian-11
 ./tests/vm/run-vm-tests.sh debian-12
+./tests/vm/run-vm-tests.sh debian-13
 ```
 
 ## Structure

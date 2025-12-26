@@ -61,6 +61,7 @@ setup() {
     [ "$status" -eq 0 ]
 }
 
-# Note: Most functions in storage.sh require system-level operations
-# (cryptsetup, LVM, mount) that need integration tests with privileged containers.
-# These smoke tests verify the functions are defined correctly.
+# Behavioral testing for storage.sh functions requires root and real devices.
+# These smoke tests verify API stability - if a function is renamed or removed,
+# these tests will catch the breaking change. Full behavioral coverage is in
+# tests/integration/ (run via Docker or VM for isolation).

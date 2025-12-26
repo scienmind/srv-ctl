@@ -25,17 +25,25 @@ log_test() {
 
 log_pass() {
     echo -e "${GREEN}[PASS]${NC} $*"
-    TESTS_PASSED=$((TESTS_PASSED + 1))
 }
 
 log_fail() {
     echo -e "${RED}[FAIL]${NC} $*"
-    TESTS_FAILED=$((TESTS_FAILED + 1))
 }
 
 run_test() {
     TESTS_RUN=$((TESTS_RUN + 1))
     log_test "$1"
+}
+
+pass_test() {
+    TESTS_PASSED=$((TESTS_PASSED + 1))
+    log_pass "$1"
+}
+
+fail_test() {
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+    log_fail "$1"
 }
 
 # Setup test config
@@ -62,9 +70,9 @@ test_help_command() {
     run_test "Help command displays usage"
     
     if bash "$PROJECT_ROOT/srv-ctl.sh" help > /dev/null 2>&1; then
-        log_pass "Help command executed successfully"
+        pass_test "Help command executed successfully"
     else
-        log_fail "Help command failed"
+        fail_test "Help command failed"
         return 1
     fi
 }
@@ -77,18 +85,10 @@ test_validate_config() {
     output=$(bash "$PROJECT_ROOT/srv-ctl.sh" validate-config 2>&1)
     local exit_code=$?
     
-    if [ $exit_code -eq 0 ]; then
-        log_pass "Config validation passed"
-        
-        # Verify validation output shows disabled devices
-        if echo "$output" | grep -q "disabled"; then
-            log_pass "Config correctly shows disabled devices"
-        else
-            log_fail "Config validation output unexpected"
-            return 1
-        fi
+    if [ $exit_code -eq 0 ] && echo "$output" | grep -q "disabled"; then
+        pass_test "Config validation passed with expected output"
     else
-        log_fail "Config validation failed"
+        fail_test "Config validation failed or unexpected output"
         echo "$output"
         return 1
     fi
@@ -99,9 +99,9 @@ test_help_variations() {
     run_test "Help command variations (-h)"
     
     if bash "$PROJECT_ROOT/srv-ctl.sh" -h > /dev/null 2>&1; then
-        log_pass "-h flag shows help"
+        pass_test "-h flag shows help"
     else
-        log_fail "-h flag failed"
+        fail_test "-h flag failed"
         return 1
     fi
 }
@@ -115,8 +115,6 @@ test_missing_config() {
         mv "$PROJECT_ROOT/config.local" "$PROJECT_ROOT/config.local.backup"
     fi
     
-    # Try to run validate-config (should fail without config)
-    # Note: Can't test start/stop commands as they require root
     local output
     output=$(bash "$PROJECT_ROOT/srv-ctl.sh" validate-config 2>&1) || true
     
@@ -126,10 +124,9 @@ test_missing_config() {
     fi
     
     if echo "$output" | grep -q "config.local.*not found"; then
-        log_pass "Missing config detected correctly"
+        pass_test "Missing config detected correctly"
     else
-        log_fail "Missing config not detected"
-        echo "Output was: $output"
+        fail_test "Missing config not detected: $output"
         return 1
     fi
 }
@@ -139,19 +136,17 @@ test_root_check() {
     run_test "Root privilege check"
     
     if [ "$EUID" -ne 0 ]; then
-        # Not root, should fail with error
         local output
         output=$(bash "$PROJECT_ROOT/srv-ctl.sh" start 2>&1) || true
         
         if echo "$output" | grep -q "run as root"; then
-            log_pass "Root check working correctly"
+            pass_test "Root check working correctly"
         else
-            log_fail "Root check not working"
-            echo "Output was: $output"
+            fail_test "Root check not working: $output"
             return 1
         fi
     else
-        log_pass "Running as root, skipping root check test"
+        pass_test "Running as root, skipping root check test"
     fi
 }
 
@@ -163,10 +158,9 @@ test_all_disabled_config() {
     output=$(bash "$PROJECT_ROOT/srv-ctl.sh" validate-config 2>&1)
     
     if echo "$output" | grep -q "0 devices enabled"; then
-        log_pass "All devices correctly disabled in test config"
+        pass_test "All devices correctly disabled in test config"
     else
-        log_fail "Device count unexpected"
-        echo "$output"
+        fail_test "Device count unexpected: $output"
         return 1
     fi
 }
@@ -175,22 +169,19 @@ test_all_disabled_config() {
 test_config_structure() {
     run_test "Config structure validation"
     
-    # Verify test config has expected structure
+    # Verify test config has expected structure and all UUIDs disabled
     if grep -q "readonly PRIMARY_DATA_UUID" "$PROJECT_ROOT/config.local"; then
-        log_pass "Config has proper structure"
+        local enabled_count
+        enabled_count=$(bash "$PROJECT_ROOT/srv-ctl.sh" validate-config 2>&1 | grep -oP '\d+(?= devices enabled)' || echo "unknown")
+        
+        if [ "$enabled_count" = "0" ]; then
+            pass_test "Config structure valid with all devices disabled"
+        else
+            fail_test "Expected 0 enabled devices, got: $enabled_count"
+            return 1
+        fi
     else
-        log_fail "Config structure invalid"
-        return 1
-    fi
-    
-    # Verify test config has all UUIDs set to "none"
-    local enabled_count
-    enabled_count=$(bash "$PROJECT_ROOT/srv-ctl.sh" validate-config 2>&1 | grep -oP '\d+(?= devices enabled)' || echo "unknown")
-    
-    if [ "$enabled_count" = "0" ]; then
-        log_pass "All test devices properly disabled"
-    else
-        log_fail "Expected 0 enabled devices, got: $enabled_count"
+        fail_test "Config structure invalid"
         return 1
     fi
 }
@@ -202,12 +193,11 @@ test_invalid_command() {
     local output
     output=$(bash "$PROJECT_ROOT/srv-ctl.sh" invalid-command 2>&1) || true
     
-    # Accept either usage message or root requirement (root check happens first for action commands)
+    # Accept either usage message or root requirement (root check happens first)
     if echo "$output" | grep -qi "usage\|unknown\|invalid\|root"; then
-        log_pass "Invalid command shows error message"
+        pass_test "Invalid command shows error message"
     else
-        log_fail "Invalid command not handled properly"
-        echo "Output was: $output"
+        fail_test "Invalid command not handled: $output"
         return 1
     fi
 }
@@ -216,7 +206,6 @@ test_invalid_command() {
 test_enabled_device_count() {
     run_test "Config with enabled device shows correct count"
     
-    # Create a temporary config with one device enabled (fake UUID)
     local temp_config="$PROJECT_ROOT/config.local"
     
     # Modify config to enable one device
@@ -229,10 +218,9 @@ test_enabled_device_count() {
     sed -i 's/PRIMARY_DATA_UUID="12345678-fake-uuid-test"/PRIMARY_DATA_UUID="none"/' "$temp_config"
     
     if echo "$output" | grep -q "1 devices enabled\|1 device enabled"; then
-        log_pass "Enabled device count correctly shown"
+        pass_test "Enabled device count correctly shown"
     else
-        log_fail "Device count incorrect"
-        echo "Output was: $output"
+        fail_test "Device count incorrect: $output"
         return 1
     fi
 }
@@ -256,10 +244,9 @@ test_invalid_encryption_type() {
     sed -i 's/PRIMARY_DATA_ENCRYPTION_TYPE="invalid_type"/PRIMARY_DATA_ENCRYPTION_TYPE="luks"/' "$temp_config"
     
     if [ $exit_code -ne 0 ] || echo "$output" | grep -qi "invalid\|unsupported\|error"; then
-        log_pass "Invalid encryption type detected"
+        pass_test "Invalid encryption type detected"
     else
-        log_fail "Invalid encryption type not detected"
-        echo "Output was: $output"
+        fail_test "Invalid encryption type not detected: $output"
         return 1
     fi
 }
@@ -272,10 +259,9 @@ test_no_arguments() {
     output=$(bash "$PROJECT_ROOT/srv-ctl.sh" 2>&1) || true
     
     if echo "$output" | grep -qi "usage"; then
-        log_pass "No arguments shows usage"
+        pass_test "No arguments shows usage"
     else
-        log_fail "No arguments did not show usage"
-        echo "Output was: $output"
+        fail_test "No arguments did not show usage: $output"
         return 1
     fi
 }
@@ -285,9 +271,9 @@ test_script_executable() {
     run_test "Script is executable"
     
     if [ -x "$PROJECT_ROOT/srv-ctl.sh" ]; then
-        log_pass "srv-ctl.sh is executable"
+        pass_test "srv-ctl.sh is executable"
     else
-        log_fail "srv-ctl.sh is not executable"
+        fail_test "srv-ctl.sh is not executable"
         return 1
     fi
 }

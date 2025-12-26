@@ -43,12 +43,10 @@ log_test() {
 
 log_pass() {
     echo -e "${GREEN}[PASS]${NC} $*"
-    ((TESTS_PASSED++))
 }
 
 log_fail() {
     echo -e "${RED}[FAIL]${NC} $*"
-    ((TESTS_FAILED++))
 }
 
 log_warn() {
@@ -58,6 +56,14 @@ log_warn() {
 run_test() {
     ((TESTS_RUN++))
     log_test "$1"
+}
+
+pass_test() {
+    ((TESTS_PASSED++))
+}
+
+fail_test() {
+    ((TESTS_FAILED++))
 }
 
 # Test 1: Mount and unmount device
@@ -205,11 +211,35 @@ main() {
     echo "========================================="
     echo ""
     
-    test_mount_unmount || true
-    test_mount_write_read || true
-    test_double_mount || true
-    test_double_unmount || true
-    test_mount_none_device || true
+    if test_mount_unmount; then
+        pass_test
+    else
+        fail_test
+    fi
+    
+    if test_mount_write_read; then
+        pass_test
+    else
+        fail_test
+    fi
+    
+    if test_double_mount; then
+        pass_test
+    else
+        fail_test
+    fi
+    
+    if test_double_unmount; then
+        pass_test
+    else
+        fail_test
+    fi
+    
+    if test_mount_none_device; then
+        pass_test
+    else
+        fail_test
+    fi
     
     echo ""
     echo "========================================="

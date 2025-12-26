@@ -116,17 +116,17 @@ create_lvm_on_luks() {
     
     local luks_dev="/dev/mapper/$TEST_LUKS_NAME"
     
-    log_info "DEBUG: Checking LUKS device..."
-    ls -la "$luks_dev" || log_error "LUKS device not found"
+    # Verify LUKS device exists
+    if [[ ! -b "$luks_dev" ]]; then
+        log_error "LUKS device not found: $luks_dev"
+        return 1
+    fi
     
     # Create physical volume
     pvcreate "$luks_dev"
     
     # Wait for device to be ready
     udevadm settle
-    
-    log_info "DEBUG: PV created, checking pvs..."
-    pvs
     
     # Create volume group
     vgcreate "$TEST_VG_NAME" "$luks_dev"
@@ -135,18 +135,7 @@ create_lvm_on_luks() {
     udevadm settle
     vgscan --mknodes
     
-    log_info "DEBUG: VG created, checking vgs and free space..."
-    vgs
-    vgdisplay "$TEST_VG_NAME"
-    
-    log_info "DEBUG: Checking /dev/$TEST_VG_NAME/ directory..."
-    ls -la "/dev/$TEST_VG_NAME/" || log_warn "VG directory not found yet"
-    
-    log_info "DEBUG: Checking device mapper..."
-    dmsetup ls
-    
     # Create logical volume (skip zeroing for speed and don't activate yet)
-    log_info "DEBUG: Creating LV with -Zn -an flags..."
     lvcreate -Zn -an -L 70M -n "$TEST_LV_NAME" "$TEST_VG_NAME" -y
     
     log_info "DEBUG: LV created (inactive), checking lvs..."
