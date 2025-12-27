@@ -7,7 +7,8 @@
 : "${PROJECT_ROOT:=$(cd "$SCRIPT_DIR/../.." && pwd)}"
 
 CACHE_DIR="${HOME}/.cache/vm-images"
-RESULTS_DIR="$SCRIPT_DIR/results"
+# Used by child scripts (run-tests.sh, run-system-tests.sh)
+export RESULTS_DIR="$SCRIPT_DIR/results"
 
 # Colors
 readonly GREEN='\033[0;32m'
@@ -171,7 +172,8 @@ cleanup_vm() {
     local work_dir="$1"
     
     if [[ -f "$work_dir/qemu.pid" ]]; then
-        local pid=$(cat "$work_dir/qemu.pid")
+        local pid
+        pid=$(cat "$work_dir/qemu.pid")
         if kill -0 "$pid" 2>/dev/null; then
             log_info "Stopping VM (PID: $pid)..."
             kill "$pid"

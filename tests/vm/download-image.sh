@@ -22,7 +22,7 @@ declare -A IMAGE_URLS=(
 
 if [[ ! -v IMAGE_URLS["$OS_VERSION"] ]]; then
     echo "ERROR: Unsupported OS version: $OS_VERSION"
-    echo "Supported: ${!IMAGE_URLS[@]}"
+    echo "Supported: ${!IMAGE_URLS[*]}"
     exit 1
 fi
 
