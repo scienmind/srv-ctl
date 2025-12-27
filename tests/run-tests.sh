@@ -1,16 +1,16 @@
 #!/bin/bash
 # Main test runner script
-# Runs integration tests (with root) and/or E2E tests
+# Runs integration tests (with root) and/or system tests
 #
 # Usage:
-#   ./run-tests.sh                    # Run all tests (integration + E2E)
+#   ./run-tests.sh                    # Run all tests (integration + system)
 #   ./run-tests.sh --integration-only # Run only integration tests (requires root)
-#   ./run-tests.sh --e2e-only         # Run only E2E tests
+#   ./run-tests.sh --system-only      # Run only system tests
 #
 # Note: This script is designed to run inside a VM (via tests/vm/run-tests.sh).
 # For local development, use:
 #   - Unit tests: bats tests/unit/*.bats
-#   - E2E CLI tests (no root): ./tests/e2e/test-e2e.sh
+#   - System CLI tests (no root): ./tests/system/test-system.sh
 
 set -euo pipefail
 
@@ -100,26 +100,26 @@ run_integration_tests() {
     fi
 }
 
-# End-to-End Tests
-run_e2e_tests() {
-    log_phase "End-to-End Tests"
+# System Tests
+run_system_tests() {
+    log_phase "System Tests"
     
-    local test_file="$SCRIPT_DIR/e2e/test-e2e.sh"
+    local test_file="$SCRIPT_DIR/system/test-system.sh"
     
     if [[ ! -f "$test_file" ]]; then
-        log_error "E2E test file not found: $test_file"
-        PHASE_FAILED+=("E2E Tests (file not found)")
+        log_error "System test file not found: $test_file"
+        PHASE_FAILED+=("System Tests (file not found)")
         return 1
     fi
     
     log_info "Running: $(basename "$test_file")"
     if "$test_file"; then
-        log_success "✓ E2E tests passed"
-        PHASE_PASSED+=("End-to-End Tests")
+        log_success "✓ System tests passed"
+        PHASE_PASSED+=("System Tests")
         return 0
     else
-        log_error "✗ E2E tests failed"
-        PHASE_FAILED+=("End-to-End Tests")
+        log_error "✗ System tests failed"
+        PHASE_FAILED+=("System Tests")
         return 1
     fi
 }
@@ -161,7 +161,7 @@ Run srv-ctl test suites.
 
 Options:
     --integration-only    Run only integration tests (requires root)
-    --e2e-only           Run only E2E tests  
+    --system-only         Run only system tests  
     -h, --help           Show this help message
 
 Note: This script is designed to run inside a VM (via tests/vm/run-tests.sh).
@@ -174,17 +174,17 @@ EOF
 
 # Main
 main() {
-    local run_e2e=true
+    local run_system=true
     local run_integration=true
 
     # Parse arguments
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --integration-only)
-                run_e2e=false
+                run_system=false
                 shift
                 ;;
-            --e2e-only)
+            --system-only)
                 run_integration=false
                 shift
                 ;;
@@ -206,8 +206,8 @@ main() {
         run_integration_tests || true
     fi
 
-    if $run_e2e; then
-        run_e2e_tests || true
+    if $run_system; then
+        run_system_tests || true
     fi
 
     print_summary

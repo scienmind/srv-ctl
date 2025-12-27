@@ -8,8 +8,8 @@ bats tests/unit/*.bats            # Unit tests
 shellcheck -x srv-ctl.sh lib/*.sh # Lint
 
 # Full VM tests (CI primary) - requires QEMU/KVM
-./tests/vm/run-tests.sh <os-name>     # Integration tests
-./tests/vm/run-e2e-tests.sh <os-name> # E2E tests
+./tests/vm/run-tests.sh <os-name>        # Integration tests
+./tests/vm/run-system-tests.sh <os-name> # System tests
 ```
 
 ## Test Architecture
@@ -18,7 +18,7 @@ shellcheck -x srv-ctl.sh lib/*.sh # Lint
 |-----------------|-------------|------|-----------------------------------|
 | **Unit**        | Local       | No   | Fast function-level tests (bats)  |
 | **Lint**        | Local       | No   | Static analysis (ShellCheck)      |
-| **E2E**         | VM          | Yes  | CLI workflows with real devices   |
+| **System**      | VM          | Yes  | CLI workflows with real devices   |
 | **Integration** | VM          | Yes  | Storage operations (LUKS/LVM)     |
 
 ### Unit Tests
@@ -45,8 +45,8 @@ Full system validation in QEMU VMs with real systemd, devices, and multi-OS test
 # Integration tests (LUKS, LVM, mount operations)
 ./tests/vm/run-tests.sh ubuntu-22.04
 
-# E2E tests (full workflows)
-./tests/vm/run-e2e-tests.sh ubuntu-22.04
+# System tests (full workflows)
+./tests/vm/run-system-tests.sh ubuntu-22.04
 ```
 
 Supported OS versions (cryptsetup >=2.4.0 required for BitLocker):
@@ -65,7 +65,7 @@ Tests run automatically via GitHub Actions:
 | `lint.yml`                 | Push, PR         | ShellCheck + syntax validation  |
 | `test-unit.yml`            | Push, PR         | Bats unit tests                 |
 | `test-integration-vm.yml`  | Push, PR         | VM integration tests (4 OSes)   |
-| `test-e2e.yml`             | Push, PR         | VM E2E tests (4 OSes)           |
+| `test-system.yml`          | Push, PR         | VM system tests (4 OSes)        |
 
 ## Writing Tests
 
@@ -128,8 +128,8 @@ tests/
 ├── unit/                 # Unit tests (bats)
 │   ├── test-os-utils.bats
 │   └── test-storage.bats
-├── e2e/                  # End-to-end tests
-│   └── test-e2e.sh
+├── system/               # System tests
+│   └── test-system.sh
 ├── integration/          # Integration tests (VM only)
 │   ├── test-luks.sh
 │   ├── test-lvm.sh
@@ -139,9 +139,9 @@ tests/
 │   ├── setup-test-env.sh
 │   └── cleanup-test-env.sh
 └── vm/                   # VM test infrastructure
-    ├── run-tests.sh      # VM integration test runner
-    ├── run-e2e-tests.sh  # VM E2E test runner
-    ├── download-image.sh # Cloud image downloader
-    ├── cleanup.sh        # VM cleanup script
-    └── vm-common.sh      # Shared VM functions
+    ├── run-tests.sh         # VM integration test runner
+    ├── run-system-tests.sh  # VM system test runner
+    ├── download-image.sh    # Cloud image downloader
+    ├── cleanup.sh           # VM cleanup script
+    └── vm-common.sh         # Shared VM functions
 ```

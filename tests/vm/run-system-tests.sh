@@ -1,5 +1,5 @@
 #!/bin/bash
-# Run E2E tests in a QEMU VM
+# Run system tests in a QEMU VM
 # Provides complete isolation with full systemd, network stack, etc.
 
 set -euo pipefail
@@ -12,7 +12,7 @@ export OS_VERSION SCRIPT_DIR PROJECT_ROOT
 # Source common VM functions
 source "$SCRIPT_DIR/vm-common.sh"
 
-# Override test command for E2E tests
+# Override test command for system tests
 run_tests_in_vm() {
     local work_dir="$1"
     local ssh_key="$work_dir/id_rsa"
@@ -32,7 +32,7 @@ run_tests_in_vm() {
     scp -i "$ssh_key" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
         -P 2222 "$tar_file" testuser@localhost:/tmp/srv-ctl.tar.gz
     
-    log_step "Running E2E tests in VM..."
+    log_step "Running system tests in VM..."
     
     # Run tests via SSH
     ssh -i "$ssh_key" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
@@ -54,18 +54,18 @@ cp tests/fixtures/config.local.test config.local
 # Make scripts executable
 chmod +x srv-ctl.sh
 chmod +x tests/run-tests.sh
-chmod +x tests/e2e/*.sh
+chmod +x tests/system/*.sh
 chmod +x tests/fixtures/*.sh
 
-# Run E2E tests only
+# Run system tests only
 echo "========================================="
-echo "Running E2E tests in VM"
+echo "Running system tests in VM"
 echo "OS: $(lsb_release -ds)"
 echo "Kernel: $(uname -r)"
 echo "========================================="
 echo ""
 
-sudo ./tests/run-tests.sh --e2e-only
+sudo ./tests/run-tests.sh --system-only
 
 EOSSH
     
@@ -81,7 +81,7 @@ EOSSH
 
 # Main
 main() {
-    log_info "E2E test runner for srv-ctl"
+    log_info "System test runner for srv-ctl"
     log_info "OS: $OS_VERSION"
     echo ""
     
@@ -100,11 +100,11 @@ main() {
     
     if run_tests_in_vm "$work_dir"; then
         echo ""
-        log_info "✓ All E2E tests passed for $OS_VERSION"
+        log_info "✓ All system tests passed for $OS_VERSION"
         exit 0
     else
         echo ""
-        log_error "✗ Some E2E tests failed for $OS_VERSION"
+        log_error "✗ Some system tests failed for $OS_VERSION"
         exit 1
     fi
 }

@@ -209,7 +209,7 @@ chmod +x srv-ctl.sh
 chmod +x tests/run-tests.sh
 chmod +x tests/integration/*.sh
 chmod +x tests/fixtures/*.sh
-chmod +x tests/e2e/*.sh
+chmod +x tests/system/*.sh
 
 # Fix apt sources for Debian 10 (buster) to use archive.debian.org
 if grep -qi 'Debian GNU/Linux 10' /etc/os-release; then

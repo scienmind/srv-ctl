@@ -15,7 +15,7 @@ Small utility to manage home server services dependent on encrypted storage.
 
 - **cryptsetup**: Version 2.4.0+ (supports both LUKS and BitLocker encryption)
    - Note: cryptsetup >=2.4.0 is only available in Debian 12+ and Ubuntu 22.04+.
-   - BitLocker support and all E2E/integration tests require these or newer OS versions.
+   - BitLocker support and all system/integration tests require these or newer OS versions.
 - **lvm2**: Required only if using LVM volumes
 - **GNU coreutils**: Required for version comparison (`sort -V`)
 - **systemd**: Required for service management
