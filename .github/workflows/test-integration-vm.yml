@@ -1,4 +1,4 @@
-name: VM Integration Tests
+name: Integration Tests
 
 on:
   push:
@@ -38,15 +38,15 @@ jobs:
           mkdir -p ~/.cache/vm-images
           ./tests/vm/download-image.sh ${{ matrix.os }}
       
-      - name: Run tests (${{ matrix.os }})
+      - name: Run integration tests (${{ matrix.os }})
         timeout-minutes: 15
-        run: ./tests/vm/run-vm-tests.sh ${{ matrix.os }}
+        run: ./tests/vm/run-tests.sh ${{ matrix.os }}
       
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: vm-results-${{ matrix.os }}
+          name: results-${{ matrix.os }}
           path: tests/vm/results/
           
       - name: Cleanup

@@ -64,4 +64,4 @@ setup() {
 # Behavioral testing for storage.sh functions requires root and real devices.
 # These smoke tests verify API stability - if a function is renamed or removed,
 # these tests will catch the breaking change. Full behavioral coverage is in
-# tests/integration/ (run via Docker or VM for isolation).
+# tests/integration/ (run via VM for isolation).

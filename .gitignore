@@ -1,1 +1,6 @@
 config.local
+config.local.*
+
+# Test artifacts
+tests/vm/results/
+tests/vm/work/

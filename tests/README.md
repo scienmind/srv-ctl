@@ -3,52 +3,69 @@
 ## Quick Start
 
 ```bash
-# Local tests (syntax + unit + e2e) - SAFE, no root required
-./tests/run-tests.sh
+# Local development tests (fast, no root required)
+bats tests/unit/*.bats            # Unit tests
+shellcheck -x srv-ctl.sh lib/*.sh # Lint
 
-# VM tests (full system validation) - CI only, multi-OS
-./tests/vm/run-vm-tests.sh <os-name>
+# Full VM tests (CI primary) - requires QEMU/KVM
+./tests/vm/run-tests.sh <os-name>     # Integration tests
+./tests/vm/run-e2e-tests.sh <os-name> # E2E tests
 ```
 
-## Test Levels
+## Test Architecture
 
-| Level      | Safety | Root | Isolation | Use Case                          |
-|------------|--------|------|-----------|-----------------------------------|
-| **Local**  | ✅ Safe | No   | None      | Quick development feedback        |
-| **VM**     | ✅ Safe | No   | Full VM   | Multi-OS validation, systemd      |
+| Level           | Environment | Root | Use Case                          |
+|-----------------|-------------|------|-----------------------------------|
+| **Unit**        | Local       | No   | Fast function-level tests (bats)  |
+| **Lint**        | Local       | No   | Static analysis (ShellCheck)      |
+| **E2E**         | VM          | Yes  | CLI workflows with real devices   |
+| **Integration** | VM          | Yes  | Storage operations (LUKS/LVM)     |
 
-### Local Tests
+### Unit Tests
 
-Syntax checks, unit tests (bats), and e2e tests. Fast feedback loop for development.
+Fast, isolated tests using the bats framework. No root or special setup required.
 
 ```bash
-./tests/run-tests.sh              # All local tests
-./tests/run-tests.sh --syntax-only
-./tests/run-tests.sh --unit-only
-./tests/run-tests.sh --e2e-only
+bats tests/unit/*.bats
 ```
 
-**Requirements**: `bats`, `shellcheck`
+### Lint
+
+Static analysis with ShellCheck to catch common shell scripting errors.
+
+```bash
+shellcheck -x srv-ctl.sh lib/*.sh
+```
 
 ### VM Tests (CI Primary)
 
-Complete validation with real systemd, network shares, and multi-OS support.
+Full system validation in QEMU VMs with real systemd, devices, and multi-OS testing.
 
 ```bash
-./tests/vm/run-vm-tests.sh <os-name>  # See tests/vm/ for available OS images
+# Integration tests (LUKS, LVM, mount operations)
+./tests/vm/run-tests.sh ubuntu-22.04
+
+# E2E tests (full workflows)
+./tests/vm/run-e2e-tests.sh ubuntu-22.04
 ```
 
-**Requirements**: QEMU/KVM
+Supported OS versions (cryptsetup >=2.4.0 required for BitLocker):
 
-## CI/CD
+- `ubuntu-22.04`, `ubuntu-24.04`
+- `debian-12`, `debian-13`
 
-Tests run automatically via GitHub Actions on push to main and pull requests:
+**Requirements**: `qemu-system-x86`, `qemu-utils`, `cloud-image-utils`
 
-- **Lint**: ShellCheck and bash syntax validation
-- **Unit Tests**: bats framework
-- **VM Integration**: QEMU VMs with cloud-init across multiple OS versions
+## CI/CD Workflows
 
-See `.github/workflows/` for workflow definitions and the current OS matrix.
+Tests run automatically via GitHub Actions:
+
+| Workflow                   | Trigger          | Description                     |
+|----------------------------|------------------|---------------------------------|
+| `lint.yml`                 | Push, PR         | ShellCheck + syntax validation  |
+| `test-unit.yml`            | Push, PR         | Bats unit tests                 |
+| `test-integration-vm.yml`  | Push, PR         | VM integration tests (4 OSes)   |
+| `test-e2e.yml`             | Push, PR         | VM E2E tests (4 OSes)           |
 
 ## Writing Tests
 
@@ -62,45 +79,25 @@ See `.github/workflows/` for workflow definitions and the current OS matrix.
 }
 ```
 
-### E2E Tests
+### Integration Tests
 
 ```bash
-test_feature() {
-    run_test "Feature description"
+test_operation() {
+    run_test "Operation description"
     
-    if command_succeeds; then
-        log_pass "Test passed"
-    else
-        log_fail "Test failed"
-        return 1
-    fi
-}
-```
-
-### Integration Tests (VM only)
-
-```bash
-test_system_operation() {
-    # Setup
-    setup_test_device
-    
-    # Test
     if perform_operation; then
-        echo "✓ Operation successful"
+        log_pass "Operation successful"
     else
-        echo "✗ Operation failed"
+        log_fail "Operation failed"
         return 1
     fi
-    
-    # Cleanup
-    cleanup_test_device
 }
 ```
 
 ## Safety
 
-- ✅ **Local tests**: Zero system impact
-- ✅ **VM tests**: Full VMs, no host interaction
+- ✅ **Unit/Lint**: Zero system impact, no root
+- ✅ **VM tests**: Full isolation in QEMU VMs
 - ❌ **Never run integration tests directly on host** (use VM)
 
 ## Troubleshooting
@@ -108,16 +105,18 @@ test_system_operation() {
 ### Bats not found
 
 ```bash
-npm install -g bats
+# Install bats
+git clone --branch v1.13.0 --depth 1 https://github.com/bats-core/bats-core.git /tmp/bats
+sudo /tmp/bats/install.sh /usr/local
 ```
 
 ### VM tests fail
 
 ```bash
-# Download OS image
-./tests/vm/download-image.sh <os-name>
+# Download OS image first
+./tests/vm/download-image.sh ubuntu-22.04
 
-# Check QEMU/KVM
+# Verify QEMU is installed
 which qemu-system-x86_64
 ```
 
@@ -125,12 +124,24 @@ which qemu-system-x86_64
 
 ```text
 tests/
-├── run-tests.sh          # Main local test runner
+├── run-tests.sh          # Test runner (for use inside VM)
 ├── unit/                 # Unit tests (bats)
-├── e2e/                  # End-to-end tests  
+│   ├── test-os-utils.bats
+│   └── test-storage.bats
+├── e2e/                  # End-to-end tests
+│   └── test-e2e.sh
 ├── integration/          # Integration tests (VM only)
-├── fixtures/             # Test configs and helpers
+│   ├── test-luks.sh
+│   ├── test-lvm.sh
+│   └── test-mount.sh
+├── fixtures/             # Test configs and setup helpers
+│   ├── config.local.test
+│   ├── setup-test-env.sh
+│   └── cleanup-test-env.sh
 └── vm/                   # VM test infrastructure
+    ├── run-tests.sh      # VM integration test runner
+    ├── run-e2e-tests.sh  # VM E2E test runner
+    ├── download-image.sh # Cloud image downloader
+    ├── cleanup.sh        # VM cleanup script
+    └── vm-common.sh      # Shared VM functions
 ```
-
-Run `tree tests/` or `find tests/ -type f` for the complete file listing.

@@ -88,8 +88,9 @@ main() {
     check_prerequisites
     
     # Create temporary work directory
-    local work_dir=$(mktemp -d -t srv-ctl-vm-XXXXXX)
-    trap "cleanup_vm '$work_dir'" EXIT INT TERM
+    local work_dir
+    work_dir=$(mktemp -d -t srv-ctl-vm-XXXXXX)
+    trap 'cleanup_vm "$work_dir"' EXIT INT TERM
     
     log_step "Setting up VM environment in: $work_dir"
     
