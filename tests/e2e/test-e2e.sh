@@ -1,5 +1,5 @@
 #!/bin/bash
-# System tests for srv-ctl.sh
+# End-to-end tests for srv-ctl.sh
 # Tests high-level workflows using the test configuration
 
 set -euo pipefail
@@ -50,7 +50,7 @@ fail_test() {
 setup_test_config() {
     # Backup existing config if it exists
     if [ -f "$PROJECT_ROOT/config.local" ]; then
-        cp "$PROJECT_ROOT/config.local" "$PROJECT_ROOT/config.local.system_test_backup"
+        cp "$PROJECT_ROOT/config.local" "$PROJECT_ROOT/config.local.e2e_original_backup"
     fi
     
     # Install test config
@@ -60,8 +60,8 @@ setup_test_config() {
 
 # Restore original config
 restore_config() {
-    if [ -f "$PROJECT_ROOT/config.local.system_test_backup" ]; then
-        mv "$PROJECT_ROOT/config.local.system_test_backup" "$PROJECT_ROOT/config.local"
+    if [ -f "$PROJECT_ROOT/config.local.e2e_original_backup" ]; then
+        mv "$PROJECT_ROOT/config.local.e2e_original_backup" "$PROJECT_ROOT/config.local"
     fi
 }
 
@@ -279,12 +279,12 @@ test_script_executable() {
 }
 
 # ============================================================================
-# System Tests with Real Environment (require root and test environment)
+# E2E Tests with Real Environment (require root and test environment)
 # ============================================================================
 
-# Test 13: System test - unlock-only command
-test_system_unlock_only() {
-    run_test "System: unlock-only command"
+# Test 13: E2E unlock-only command
+test_e2e_unlock_only() {
+    run_test "E2E: unlock-only command"
     
     # Run unlock-only
     if sudo bash "$PROJECT_ROOT/srv-ctl.sh" unlock-only 2>&1; then
@@ -301,9 +301,9 @@ test_system_unlock_only() {
     fi
 }
 
-# Test 14: System test - stop command (unmounts devices)
-test_system_stop() {
-    run_test "System: stop command"
+# Test 14: E2E stop command (unmounts devices)
+test_e2e_stop() {
+    run_test "E2E: stop command"
     
     # Ensure device is mounted first
     if ! mountpoint -q "/mnt/$TEST_MOUNT_POINT" 2>/dev/null; then
@@ -325,9 +325,9 @@ test_system_stop() {
     fi
 }
 
-# Test 15: System test - start command (full workflow)
-test_system_start() {
-    run_test "System: start command"
+# Test 15: E2E start command (full workflow)
+test_e2e_start() {
+    run_test "E2E: start command"
     
     # Ensure clean state
     sudo bash "$PROJECT_ROOT/srv-ctl.sh" stop &>/dev/null || true
@@ -347,9 +347,9 @@ test_system_start() {
     fi
 }
 
-# Test 16: System test - stop-services-only command
-test_system_stop_services_only() {
-    run_test "System: stop-services-only command"
+# Test 16: E2E stop-services-only command
+test_e2e_stop_services_only() {
+    run_test "E2E: stop-services-only command"
     
     # Ensure device is mounted
     if ! mountpoint -q "/mnt/$TEST_MOUNT_POINT" 2>/dev/null; then
@@ -371,9 +371,9 @@ test_system_stop_services_only() {
     fi
 }
 
-# Test 17: System test - idempotency - double start
-test_system_double_start() {
-    run_test "System: double start (idempotency)"
+# Test 17: E2E idempotency - double start
+test_e2e_double_start() {
+    run_test "E2E: double start (idempotency)"
     
     # Ensure clean state
     sudo bash "$PROJECT_ROOT/srv-ctl.sh" stop &>/dev/null || true
@@ -394,9 +394,9 @@ test_system_double_start() {
     fi
 }
 
-# Test 18: System test - idempotency - double stop
-test_system_double_stop() {
-    run_test "System: double stop (idempotency)"
+# Test 18: E2E idempotency - double stop
+test_e2e_double_stop() {
+    run_test "E2E: double stop (idempotency)"
     
     # Ensure started state
     sudo bash "$PROJECT_ROOT/srv-ctl.sh" start &>/dev/null || true
@@ -417,15 +417,15 @@ test_system_double_stop() {
     fi
 }
 
-# Setup system test environment (reuses integration test setup)
-setup_system_environment() {
+# Setup E2E test environment (reuses integration test setup)
+setup_e2e_environment() {
     if [ "$EUID" -ne 0 ]; then
-        log_fail "System tests require root privileges. Skipping system tests."
+        log_fail "E2E tests require root privileges. Skipping E2E tests."
         return 1
     fi
     
     # Run the integration test setup
-    echo "Setting up system test environment..."
+    echo "Setting up E2E test environment..."
     if ! sudo bash "$PROJECT_ROOT/tests/fixtures/setup-test-env.sh"; then
         log_fail "Failed to setup test environment"
         if [ -f "$PROJECT_ROOT/tests/fixtures/cleanup-test-env.sh" ]; then
@@ -444,89 +444,88 @@ setup_system_environment() {
         chmod 600 "$key_file"
         
 
-        # Create system test config that uses the test environment
+        # Create E2E config that uses the test environment
 
         cat > "$PROJECT_ROOT/config.local" <<EOF
-#!/usr/bin/env bash
-# System Test Configuration - uses integration test environment
+    #!/usr/bin/env bash
+    # E2E Test Configuration - uses integration test environment
 
-readonly CRYPTSETUP_MIN_VERSION="2.4.0"
+    readonly CRYPTSETUP_MIN_VERSION="2.4.0"
 
-# Services (ST_SERVICE_1 set to 'ssh' for system test)
-readonly ST_USER_1="none"
-readonly ST_SERVICE_1="ssh"
-readonly ST_USER_2="none"
-readonly ST_SERVICE_2="none"
-readonly DOCKER_SERVICE="none"
+    # Services (ST_SERVICE_1 set to 'ssh' for E2E test)
+    readonly ST_USER_1="none"
+    readonly ST_SERVICE_1="ssh"
+    readonly ST_USER_2="none"
+    readonly ST_SERVICE_2="none"
+    readonly DOCKER_SERVICE="none"
 
-# Primary Data Device (uses test environment)
-readonly PRIMARY_DATA_UUID="$TEST_LOOP_UUID"
-readonly PRIMARY_DATA_KEY_FILE="$key_file"
-readonly PRIMARY_DATA_ENCRYPTION_TYPE="luks"
-readonly PRIMARY_DATA_MAPPER="$TEST_LV_MAPPER"
-readonly PRIMARY_DATA_LVM_NAME="$TEST_LV_NAME"
-readonly PRIMARY_DATA_LVM_GROUP="$TEST_VG_NAME"
-readonly PRIMARY_DATA_MOUNT="$TEST_MOUNT_POINT"
-readonly PRIMARY_DATA_OWNER_USER="none"
-readonly PRIMARY_DATA_OWNER_GROUP="none"
-readonly PRIMARY_DATA_MOUNT_OPTIONS="defaults"
+    # Primary Data Device (uses test environment)
+    readonly PRIMARY_DATA_UUID="$TEST_LOOP_UUID"
+    readonly PRIMARY_DATA_KEY_FILE="$key_file"
+    readonly PRIMARY_DATA_ENCRYPTION_TYPE="luks"
+    readonly PRIMARY_DATA_MAPPER="$TEST_LV_MAPPER"
+    readonly PRIMARY_DATA_LVM_NAME="$TEST_LV_NAME"
+    readonly PRIMARY_DATA_LVM_GROUP="$TEST_VG_NAME"
+    readonly PRIMARY_DATA_MOUNT="$TEST_MOUNT_POINT"
+    readonly PRIMARY_DATA_OWNER_USER="none"
+    readonly PRIMARY_DATA_OWNER_GROUP="none"
+    readonly PRIMARY_DATA_MOUNT_OPTIONS="defaults"
 
-# All other storage devices disabled
-readonly STORAGE_1A_UUID="none"
-readonly STORAGE_1A_KEY_FILE="none"
-readonly STORAGE_1A_ENCRYPTION_TYPE="luks"
-readonly STORAGE_1A_MAPPER="none"
-readonly STORAGE_1A_LVM_NAME="none"
-readonly STORAGE_1A_LVM_GROUP="none"
-readonly STORAGE_1A_MOUNT="none"
-readonly STORAGE_1A_OWNER_USER="none"
-readonly STORAGE_1A_OWNER_GROUP="none"
-readonly STORAGE_1A_MOUNT_OPTIONS="defaults"
+    # All other storage devices disabled
+    readonly STORAGE_1A_UUID="none"
+    readonly STORAGE_1A_KEY_FILE="none"
+    readonly STORAGE_1A_ENCRYPTION_TYPE="luks"
+    readonly STORAGE_1A_MAPPER="none"
+    readonly STORAGE_1A_LVM_NAME="none"
+    readonly STORAGE_1A_LVM_GROUP="none"
+    readonly STORAGE_1A_MOUNT="none"
+    readonly STORAGE_1A_OWNER_USER="none"
+    readonly STORAGE_1A_OWNER_GROUP="none"
+    readonly STORAGE_1A_MOUNT_OPTIONS="defaults"
 
-readonly STORAGE_1B_UUID="none"
-readonly STORAGE_1B_KEY_FILE="none"
-readonly STORAGE_1B_ENCRYPTION_TYPE="luks"
-readonly STORAGE_1B_MAPPER="none"
-readonly STORAGE_1B_LVM_NAME="none"
-readonly STORAGE_1B_LVM_GROUP="none"
-readonly STORAGE_1B_MOUNT="none"
-readonly STORAGE_1B_OWNER_USER="none"
-readonly STORAGE_1B_OWNER_GROUP="none"
-readonly STORAGE_1B_MOUNT_OPTIONS="defaults"
+    readonly STORAGE_1B_UUID="none"
+    readonly STORAGE_1B_KEY_FILE="none"
+    readonly STORAGE_1B_ENCRYPTION_TYPE="luks"
+    readonly STORAGE_1B_MAPPER="none"
+    readonly STORAGE_1B_LVM_NAME="none"
+    readonly STORAGE_1B_LVM_GROUP="none"
+    readonly STORAGE_1B_MOUNT="none"
+    readonly STORAGE_1B_OWNER_USER="none"
+    readonly STORAGE_1B_OWNER_GROUP="none"
+    readonly STORAGE_1B_MOUNT_OPTIONS="defaults"
 
-readonly STORAGE_2A_UUID="none"
-readonly STORAGE_2A_KEY_FILE="none"
-readonly STORAGE_2A_ENCRYPTION_TYPE="luks"
-readonly STORAGE_2A_MAPPER="none"
-readonly STORAGE_2A_LVM_NAME="none"
-readonly STORAGE_2A_LVM_GROUP="none"
-readonly STORAGE_2A_MOUNT="none"
-readonly STORAGE_2A_OWNER_USER="none"
-readonly STORAGE_2A_OWNER_GROUP="none"
-readonly STORAGE_2A_MOUNT_OPTIONS="defaults"
+    readonly STORAGE_2A_UUID="none"
+    readonly STORAGE_2A_KEY_FILE="none"
+    readonly STORAGE_2A_ENCRYPTION_TYPE="luks"
+    readonly STORAGE_2A_MAPPER="none"
+    readonly STORAGE_2A_LVM_NAME="none"
+    readonly STORAGE_2A_LVM_GROUP="none"
+    readonly STORAGE_2A_MOUNT="none"
+    readonly STORAGE_2A_OWNER_USER="none"
+    readonly STORAGE_2A_OWNER_GROUP="none"
+    readonly STORAGE_2A_MOUNT_OPTIONS="defaults"
 
-readonly STORAGE_2B_UUID="none"
-readonly STORAGE_2B_KEY_FILE="none"
-readonly STORAGE_2B_ENCRYPTION_TYPE="luks"
-readonly STORAGE_2B_MAPPER="none"
-readonly STORAGE_2B_LVM_NAME="none"
-readonly STORAGE_2B_LVM_GROUP="none"
-readonly STORAGE_2B_MOUNT="none"
-readonly STORAGE_2B_OWNER_USER="none"
-readonly STORAGE_2B_OWNER_GROUP="none"
-readonly STORAGE_2B_MOUNT_OPTIONS="defaults"
+    readonly STORAGE_2B_UUID="none"
+    readonly STORAGE_2B_KEY_FILE="none"
+    readonly STORAGE_2B_ENCRYPTION_TYPE="luks"
+    readonly STORAGE_2B_MAPPER="none"
+    readonly STORAGE_2B_LVM_NAME="none"
+    readonly STORAGE_2B_LVM_GROUP="none"
+    readonly STORAGE_2B_MOUNT="none"
+    readonly STORAGE_2B_OWNER_USER="none"
+    readonly STORAGE_2B_OWNER_GROUP="none"
+    readonly STORAGE_2B_MOUNT_OPTIONS="defaults"
 
-# Network Share (disabled)
-readonly NETWORK_SHARE_PROTOCOL="none"
-readonly NETWORK_SHARE_ADDRESS="none"
-readonly NETWORK_SHARE_CREDENTIALS="none"
-readonly NETWORK_SHARE_MOUNT="none"
-readonly NETWORK_SHARE_OWNER_USER="none"
-readonly NETWORK_SHARE_OWNER_GROUP="none"
-readonly NETWORK_SHARE_OPTIONS="defaults"
-EOF
+    readonly NETWORK_SHARE_PROTOCOL="none"
+    readonly NETWORK_SHARE_ADDRESS="none"
+    readonly NETWORK_SHARE_CREDENTIALS="none"
+    readonly NETWORK_SHARE_MOUNT="none"
+    readonly NETWORK_SHARE_OWNER_USER="none"
+    readonly NETWORK_SHARE_OWNER_GROUP="none"
+    readonly NETWORK_SHARE_OPTIONS="defaults"
+    EOF
         
-        log_pass "System test environment setup complete"
+        log_pass "E2E test environment setup complete"
         return 0
     else
         log_fail "Test environment configuration not found"
@@ -534,8 +533,8 @@ EOF
     fi
 }
 
-# Cleanup system test environment
-cleanup_system_environment() {
+# Cleanup E2E environment
+cleanup_e2e_environment() {
     if [ "$EUID" -eq 0 ]; then
         # Ensure everything is stopped/unmounted
         sudo bash "$PROJECT_ROOT/srv-ctl.sh" stop &>/dev/null || true
@@ -550,7 +549,7 @@ cleanup_system_environment() {
 # Main
 main() {
     echo "========================================="
-    echo "System Tests for srv-ctl"
+    echo "End-to-End Tests for srv-ctl"
     echo "========================================="
     echo ""
     
@@ -569,29 +568,29 @@ main() {
     test_no_arguments
     test_script_executable
     
-    # System tests with real environment (require root)
+    # E2E tests with real environment (require root)
     echo ""
     echo "========================================="
-    echo "System Tests with Real Environment"
+    echo "E2E Tests with Real Environment"
     echo "========================================="
     echo ""
     
-    if setup_system_environment; then
-        test_system_unlock_only
-        test_system_stop
-        test_system_start
-        test_system_stop_services_only
-        test_system_double_start
-        test_system_double_stop
+    if setup_e2e_environment; then
+        test_e2e_unlock_only
+        test_e2e_stop
+        test_e2e_start
+        test_e2e_stop_services_only
+        test_e2e_double_start
+        test_e2e_double_stop
         
-        cleanup_system_environment
+        cleanup_e2e_environment
     else
         # If running as root (which we should be in CI), setup failure is a test failure
         if [ "$EUID" -eq 0 ]; then
-            echo "System test environment setup failed (this is a test failure in CI)"
+            echo "E2E test environment setup failed (this is a test failure in CI)"
             TESTS_FAILED=$((TESTS_FAILED + 1))
         else
-            echo "Skipping system tests (requires root)"
+            echo "Skipping E2E tests (requires root)"
         fi
     fi
     

@@ -110,8 +110,11 @@ The project includes comprehensive tests with VM-based testing:
 # Run local tests (no root required)
 ./tests/run-tests.sh
 
-# Run full VM tests (CI only, multi-OS)
-./tests/vm/run-vm-tests.sh ubuntu-22.04
+# Run integration tests in VM (CI or manual)
+./tests/vm/run-tests.sh ubuntu-22.04
+
+# Run system tests in VM (CI or manual)
+./tests/vm/run-system-tests.sh ubuntu-22.04
 ```
 
 See [`tests/README.md`](tests/README.md) for detailed testing documentation.

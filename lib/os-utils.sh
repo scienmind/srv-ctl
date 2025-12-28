@@ -71,7 +71,7 @@ function build_mount_options() {
     local l_owner_user=$1
     local l_owner_group=$2
     local l_additional_options=$3
-    
+
     local l_uid
     local l_gid
     local l_final_options=""
@@ -85,7 +85,7 @@ function build_mount_options() {
         fi
         l_final_options="uid=$l_uid"
     fi
-    
+
     # Get GID from groupname
     if [ "$l_owner_group" != "none" ]; then
         l_gid=$(get_gid_from_groupname "$l_owner_group")
@@ -93,29 +93,27 @@ function build_mount_options() {
             echo "$l_gid"  # Print error message
             return "$FAILURE"
         fi
-        
         if [ -n "$l_final_options" ]; then
             l_final_options="$l_final_options,gid=$l_gid"
         else
             l_final_options="gid=$l_gid"
         fi
     fi
-    
-    # Add additional options
-        # Only add 'defaults' if no other options are present. Never combine 'defaults' with explicit options.
-        if [ "$l_additional_options" != "none" ] && [ "$l_additional_options" != "defaults" ]; then
+
+    # Add additional options (never combine 'defaults' with explicit options)
+    if [ "$l_additional_options" != "none" ] && [ "$l_additional_options" != "defaults" ]; then
         if [ -n "$l_final_options" ]; then
             l_final_options="$l_final_options,$l_additional_options"
         else
             l_final_options="$l_additional_options"
         fi
     fi
-    
+
     # If no options specified, use defaults
     if [ -z "$l_final_options" ]; then
         l_final_options="defaults"
     fi
-    
+
     echo "$l_final_options"
     return "$SUCCESS"
 }

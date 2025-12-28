@@ -71,7 +71,7 @@ test_luks_lock_unlock() {
     run_test "LUKS lock and unlock"
     
     # Deactivate LVM first (LUKS can't be closed while in use)
-    # Note: Using A && B || C pattern intentionally - we want to log either success or warning, not fail the test
+    # Intentionally using 'A && B || C' pattern: logs pass if deactivation succeeds, logs warning if not, but does not fail test. This is non-fatal by design for idempotency.
     lvchange -an "$TEST_VG_NAME/$TEST_LV_NAME" 2>/dev/null && log_pass "Deactivated LVM logical volume" || log_warn "LVM already inactive or deactivation failed"
     vgchange -an "$TEST_VG_NAME" 2>/dev/null && log_pass "Deactivated volume group" || log_warn "VG already inactive"
     

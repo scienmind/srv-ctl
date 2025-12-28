@@ -12,6 +12,10 @@ readonly TEST_LV_NAME="test_lv"
 readonly TEST_MOUNT_POINT="/tmp/test_mount"
 readonly TEST_PASSWORD="test123456"
 
+# Return codes for consistency with other scripts
+readonly SUCCESS=0
+readonly FAILURE=1
+
 # Colors for output
 readonly RED='\033[0;31m'
 readonly GREEN='\033[0;32m'
