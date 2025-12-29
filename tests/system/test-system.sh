@@ -547,6 +547,151 @@ cleanup_system_environment() {
     fi
 }
 
+# Network Share System Tests (CIFS/NFS)
+test_network_share_system_workflows() {
+    echo ""
+    echo "========================================="
+    echo "System Tests: Network Shares (CIFS/NFS)"
+    echo "========================================="
+    echo ""
+
+    # --- CIFS (Samba) ---
+    echo "[Setup] Starting Samba test server..."
+    sudo bash "$PROJECT_ROOT/tests/fixtures/setup-samba-test.sh"
+
+    # Patch config.local for CIFS
+    cat > "$PROJECT_ROOT/config.local" <<EOF
+#!/usr/bin/env bash
+readonly CRYPTSETUP_MIN_VERSION="2.4.0"
+readonly ST_USER_1="none"
+readonly ST_SERVICE_1="none"
+readonly ST_USER_2="none"
+readonly ST_SERVICE_2="none"
+readonly DOCKER_SERVICE="none"
+readonly PRIMARY_DATA_UUID="none"
+readonly PRIMARY_DATA_MOUNT="none"
+readonly PRIMARY_DATA_MAPPER="none"
+readonly PRIMARY_DATA_LVM_NAME="none"
+readonly PRIMARY_DATA_LVM_GROUP="none"
+readonly PRIMARY_DATA_KEY_FILE="none"
+readonly PRIMARY_DATA_ENCRYPTION_TYPE="luks"
+readonly PRIMARY_DATA_OWNER_USER="none"
+readonly PRIMARY_DATA_OWNER_GROUP="none"
+readonly PRIMARY_DATA_MOUNT_OPTIONS="defaults"
+readonly NETWORK_SHARE_PROTOCOL="cifs"
+readonly NETWORK_SHARE_ADDRESS="//localhost/testshare"
+readonly NETWORK_SHARE_CREDENTIALS="/tmp/smb-cred"
+readonly NETWORK_SHARE_MOUNT="test-cifs"
+readonly NETWORK_SHARE_OWNER_USER="none"
+readonly NETWORK_SHARE_OWNER_GROUP="none"
+readonly NETWORK_SHARE_OPTIONS="rw,iocharset=utf8"
+EOF
+
+    # Write credentials file
+    cat > /tmp/smb-cred <<EOF
+username=testuser
+password=testpass
+EOF
+    chmod 600 /tmp/smb-cred
+
+    run_test "CIFS: Mount network share via srv-ctl.sh start"
+    if sudo bash "$PROJECT_ROOT/srv-ctl.sh" start 2>&1; then
+        if mountpoint -q "/mnt/test-cifs"; then
+            pass_test "CIFS share mounted via start"
+            # I/O test
+            echo "testfile" | sudo tee /mnt/test-cifs/systest.txt > /dev/null
+            if sudo grep -q "testfile" /mnt/test-cifs/systest.txt; then
+                pass_test "CIFS share I/O works"
+            else
+                fail_test "CIFS share I/O failed"
+            fi
+        else
+            fail_test "CIFS share not mounted"
+        fi
+    else
+        fail_test "srv-ctl.sh start failed for CIFS"
+    fi
+
+    run_test "CIFS: Unmount network share via srv-ctl.sh stop"
+    if sudo bash "$PROJECT_ROOT/srv-ctl.sh" stop 2>&1; then
+        if ! mountpoint -q "/mnt/test-cifs"; then
+            pass_test "CIFS share unmounted via stop"
+        else
+            fail_test "CIFS share still mounted after stop"
+        fi
+    else
+        fail_test "srv-ctl.sh stop failed for CIFS"
+    fi
+
+    # Cleanup Samba
+    sudo bash "$PROJECT_ROOT/tests/fixtures/cleanup-samba-test.sh"
+    sudo rm -f /tmp/smb-cred
+
+    # --- NFS ---
+    echo "[Setup] Starting NFS test server..."
+    sudo bash "$PROJECT_ROOT/tests/fixtures/setup-nfs-test.sh"
+
+    # Patch config.local for NFS
+    cat > "$PROJECT_ROOT/config.local" <<EOF
+#!/usr/bin/env bash
+readonly CRYPTSETUP_MIN_VERSION="2.4.0"
+readonly ST_USER_1="none"
+readonly ST_SERVICE_1="none"
+readonly ST_USER_2="none"
+readonly ST_SERVICE_2="none"
+readonly DOCKER_SERVICE="none"
+readonly PRIMARY_DATA_UUID="none"
+readonly PRIMARY_DATA_MOUNT="none"
+readonly PRIMARY_DATA_MAPPER="none"
+readonly PRIMARY_DATA_LVM_NAME="none"
+readonly PRIMARY_DATA_LVM_GROUP="none"
+readonly PRIMARY_DATA_KEY_FILE="none"
+readonly PRIMARY_DATA_ENCRYPTION_TYPE="luks"
+readonly PRIMARY_DATA_OWNER_USER="none"
+readonly PRIMARY_DATA_OWNER_GROUP="none"
+readonly PRIMARY_DATA_MOUNT_OPTIONS="defaults"
+readonly NETWORK_SHARE_PROTOCOL="nfs"
+readonly NETWORK_SHARE_ADDRESS="localhost:/tmp/test_nfs_share"
+readonly NETWORK_SHARE_CREDENTIALS="none"
+readonly NETWORK_SHARE_MOUNT="test-nfs"
+readonly NETWORK_SHARE_OWNER_USER="none"
+readonly NETWORK_SHARE_OWNER_GROUP="none"
+readonly NETWORK_SHARE_OPTIONS="rw,sync"
+EOF
+
+    run_test "NFS: Mount network share via srv-ctl.sh start"
+    if sudo bash "$PROJECT_ROOT/srv-ctl.sh" start 2>&1; then
+        if mountpoint -q "/mnt/test-nfs"; then
+            pass_test "NFS share mounted via start"
+            # I/O test
+            echo "testfile" | sudo tee /mnt/test-nfs/systest.txt > /dev/null
+            if sudo grep -q "testfile" /mnt/test-nfs/systest.txt; then
+                pass_test "NFS share I/O works"
+            else
+                fail_test "NFS share I/O failed"
+            fi
+        else
+            fail_test "NFS share not mounted"
+        fi
+    else
+        fail_test "srv-ctl.sh start failed for NFS"
+    fi
+
+    run_test "NFS: Unmount network share via srv-ctl.sh stop"
+    if sudo bash "$PROJECT_ROOT/srv-ctl.sh" stop 2>&1; then
+        if ! mountpoint -q "/mnt/test-nfs"; then
+            pass_test "NFS share unmounted via stop"
+        else
+            fail_test "NFS share still mounted after stop"
+        fi
+    else
+        fail_test "srv-ctl.sh stop failed for NFS"
+    fi
+
+    # Cleanup NFS
+    sudo bash "$PROJECT_ROOT/tests/fixtures/cleanup-nfs-test.sh"
+}
+
 # Main
 main() {
     echo "========================================="
@@ -576,6 +721,7 @@ main() {
     echo "========================================="
     echo ""
     
+
     if setup_system_environment; then
         test_system_unlock_only
         test_system_stop
@@ -583,7 +729,10 @@ main() {
         test_system_stop_services_only
         test_system_double_start
         test_system_double_stop
-        
+
+        # Run real network share system tests (CIFS/NFS)
+        test_network_share_system_workflows
+
         cleanup_system_environment
     else
         # If running as root (which we should be in CI), setup failure is a test failure

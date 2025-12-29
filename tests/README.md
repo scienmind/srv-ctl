@@ -81,18 +81,20 @@ Tests run automatically via GitHub Actions:
 
 ### Integration Tests
 
-```bash
-test_operation() {
-    run_test "Operation description"
-    
-    if perform_operation; then
-        log_pass "Operation successful"
-    else
-        log_fail "Operation failed"
-        return 1
-    fi
-}
-```
+Integration tests cover real storage operations (LUKS, LVM, mount, network shares) using BATS and real Samba/NFS servers. No mocks or fakes are used.
+
+- **test-luks-keyfile.bats**: LUKS key file authentication (valid, missing, unreadable, wrong key, symlink, spaces, error handling)
+- **test-network-shares.bats**: Network share mounting (CIFS/NFS) with real Samba/NFS servers, credentials, error handling, idempotency, and permission scenarios
+
+All integration tests are run in CI via VM on all supported OSes.
+
+### System Tests
+
+System tests validate full CLI workflows using srv-ctl.sh, including device orchestration, service management, and network share mounting. These tests use real services and config patching to simulate production scenarios.
+
+- **test-system.sh**: Covers start/stop/unlock workflows, config validation, error handling, and now includes real network share (CIFS/NFS) and key file authentication tests as part of the main workflow.
+
+All system tests are run in CI via VM on all supported OSes.
 
 ## Safety
 
@@ -133,7 +135,9 @@ tests/
 ├── integration/          # Integration tests (VM only)
 │   ├── test-luks.sh
 │   ├── test-lvm.sh
-│   └── test-mount.sh
+│   ├── test-mount.sh
+│   ├── test-luks-keyfile.bats
+│   └── test-network-shares.bats
 ├── fixtures/             # Test configs and setup helpers
 │   ├── config.local.test
 │   ├── setup-test-env.sh
@@ -145,3 +149,10 @@ tests/
     ├── cleanup.sh           # VM cleanup script
     └── vm-common.sh         # Shared VM functions
 ```
+
+## Coverage Notes
+
+- **Network share (CIFS/NFS) and key file authentication tests are now fully implemented and CI-integrated.**
+- All major scenarios, error handling, and idempotency are covered at both integration (BATS) and system (workflow) levels.
+- No mocks/fakes are used; all tests use real services and I/O.
+- See TEST_COVERAGE_GAPS.md for detailed coverage tracking.

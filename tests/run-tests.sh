@@ -72,6 +72,7 @@ run_integration_tests() {
         "$SCRIPT_DIR/integration/test-luks.sh"
         "$SCRIPT_DIR/integration/test-lvm.sh"
         "$SCRIPT_DIR/integration/test-mount.sh"
+        "$SCRIPT_DIR/integration/test-network-shares.bats"
     )
     
     local failed=0
