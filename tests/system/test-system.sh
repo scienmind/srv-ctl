@@ -556,8 +556,10 @@ test_network_share_system_workflows() {
     echo ""
 
     # --- CIFS (Samba) ---
-    echo "[Setup] Starting Samba test server..."
-    sudo bash "$PROJECT_ROOT/tests/fixtures/setup-samba-test.sh"
+    echo "[Setup] Verifying Samba test server (configured via cloud-init)..."
+    if ! systemctl is-active --quiet smbd 2>/dev/null; then
+        echo "[WARN] Samba service not running, tests may fail"
+    fi
 
     # Patch config.local for CIFS
     cat > "$PROJECT_ROOT/config.local" <<EOF
@@ -578,13 +580,53 @@ readonly PRIMARY_DATA_ENCRYPTION_TYPE="luks"
 readonly PRIMARY_DATA_OWNER_USER="none"
 readonly PRIMARY_DATA_OWNER_GROUP="none"
 readonly PRIMARY_DATA_MOUNT_OPTIONS="defaults"
+readonly STORAGE_1A_MOUNT="none"
+readonly STORAGE_1A_MAPPER="none"
+readonly STORAGE_1A_LVM_NAME="none"
+readonly STORAGE_1A_LVM_GROUP="none"
+readonly STORAGE_1A_UUID="none"
+readonly STORAGE_1A_KEY_FILE="none"
+readonly STORAGE_1A_ENCRYPTION_TYPE="luks"
+readonly STORAGE_1A_OWNER_USER="none"
+readonly STORAGE_1A_OWNER_GROUP="none"
+readonly STORAGE_1A_MOUNT_OPTIONS="defaults"
+readonly STORAGE_1B_MOUNT="none"
+readonly STORAGE_1B_MAPPER="none"
+readonly STORAGE_1B_LVM_NAME="none"
+readonly STORAGE_1B_LVM_GROUP="none"
+readonly STORAGE_1B_UUID="none"
+readonly STORAGE_1B_KEY_FILE="none"
+readonly STORAGE_1B_ENCRYPTION_TYPE="luks"
+readonly STORAGE_1B_OWNER_USER="none"
+readonly STORAGE_1B_OWNER_GROUP="none"
+readonly STORAGE_1B_MOUNT_OPTIONS="defaults"
+readonly STORAGE_2A_MOUNT="none"
+readonly STORAGE_2A_MAPPER="none"
+readonly STORAGE_2A_LVM_NAME="none"
+readonly STORAGE_2A_LVM_GROUP="none"
+readonly STORAGE_2A_UUID="none"
+readonly STORAGE_2A_KEY_FILE="none"
+readonly STORAGE_2A_ENCRYPTION_TYPE="luks"
+readonly STORAGE_2A_OWNER_USER="none"
+readonly STORAGE_2A_OWNER_GROUP="none"
+readonly STORAGE_2A_MOUNT_OPTIONS="defaults"
+readonly STORAGE_2B_MOUNT="none"
+readonly STORAGE_2B_MAPPER="none"
+readonly STORAGE_2B_LVM_NAME="none"
+readonly STORAGE_2B_LVM_GROUP="none"
+readonly STORAGE_2B_UUID="none"
+readonly STORAGE_2B_KEY_FILE="none"
+readonly STORAGE_2B_ENCRYPTION_TYPE="luks"
+readonly STORAGE_2B_OWNER_USER="none"
+readonly STORAGE_2B_OWNER_GROUP="none"
+readonly STORAGE_2B_MOUNT_OPTIONS="defaults"
 readonly NETWORK_SHARE_PROTOCOL="cifs"
 readonly NETWORK_SHARE_ADDRESS="//localhost/testshare"
 readonly NETWORK_SHARE_CREDENTIALS="/tmp/smb-cred"
 readonly NETWORK_SHARE_MOUNT="test-cifs"
 readonly NETWORK_SHARE_OWNER_USER="none"
 readonly NETWORK_SHARE_OWNER_GROUP="none"
-readonly NETWORK_SHARE_OPTIONS="rw,iocharset=utf8"
+readonly NETWORK_SHARE_OPTIONS="vers=3.0"
 EOF
 
     # Write credentials file
@@ -594,6 +636,16 @@ password=testpass
 EOF
     chmod 600 /tmp/smb-cred
 
+    # Debug: Check mount.cifs dependencies
+    echo "[DEBUG] Checking mount.cifs binary and dependencies:"
+    which mount.cifs || echo "mount.cifs not in PATH"
+    ldd /sbin/mount.cifs 2>&1 || ldd /usr/sbin/mount.cifs 2>&1 || echo "ldd failed"
+    echo "[DEBUG] Direct mount test:"
+    sudo mkdir -p /tmp/direct-test-mount
+    sudo mount -t cifs //localhost/testshare /tmp/direct-test-mount -o credentials=/tmp/smb-cred,vers=3.0 2>&1 && echo "Direct mount SUCCESS" || echo "Direct mount FAILED: $?"
+    sudo umount /tmp/direct-test-mount 2>/dev/null || true
+    sudo rmdir /tmp/direct-test-mount 2>/dev/null || true
+    
     run_test "CIFS: Mount network share via srv-ctl.sh start"
     if sudo bash "$PROJECT_ROOT/srv-ctl.sh" start 2>&1; then
         if mountpoint -q "/mnt/test-cifs"; then
@@ -623,13 +675,14 @@ EOF
         fail_test "srv-ctl.sh stop failed for CIFS"
     fi
 
-    # Cleanup Samba
-    sudo bash "$PROJECT_ROOT/tests/fixtures/cleanup-samba-test.sh"
+    # Cleanup credentials file (services stay running for potential reuse)
     sudo rm -f /tmp/smb-cred
 
     # --- NFS ---
-    echo "[Setup] Starting NFS test server..."
-    sudo bash "$PROJECT_ROOT/tests/fixtures/setup-nfs-test.sh"
+    echo "[Setup] Verifying NFS test server (configured via cloud-init)..."
+    if ! systemctl is-active --quiet nfs-server 2>/dev/null; then
+        echo "[WARN] NFS service not running, tests may fail"
+    fi
 
     # Patch config.local for NFS
     cat > "$PROJECT_ROOT/config.local" <<EOF
@@ -650,6 +703,46 @@ readonly PRIMARY_DATA_ENCRYPTION_TYPE="luks"
 readonly PRIMARY_DATA_OWNER_USER="none"
 readonly PRIMARY_DATA_OWNER_GROUP="none"
 readonly PRIMARY_DATA_MOUNT_OPTIONS="defaults"
+readonly STORAGE_1A_MOUNT="none"
+readonly STORAGE_1A_MAPPER="none"
+readonly STORAGE_1A_LVM_NAME="none"
+readonly STORAGE_1A_LVM_GROUP="none"
+readonly STORAGE_1A_UUID="none"
+readonly STORAGE_1A_KEY_FILE="none"
+readonly STORAGE_1A_ENCRYPTION_TYPE="luks"
+readonly STORAGE_1A_OWNER_USER="none"
+readonly STORAGE_1A_OWNER_GROUP="none"
+readonly STORAGE_1A_MOUNT_OPTIONS="defaults"
+readonly STORAGE_1B_MOUNT="none"
+readonly STORAGE_1B_MAPPER="none"
+readonly STORAGE_1B_LVM_NAME="none"
+readonly STORAGE_1B_LVM_GROUP="none"
+readonly STORAGE_1B_UUID="none"
+readonly STORAGE_1B_KEY_FILE="none"
+readonly STORAGE_1B_ENCRYPTION_TYPE="luks"
+readonly STORAGE_1B_OWNER_USER="none"
+readonly STORAGE_1B_OWNER_GROUP="none"
+readonly STORAGE_1B_MOUNT_OPTIONS="defaults"
+readonly STORAGE_2A_MOUNT="none"
+readonly STORAGE_2A_MAPPER="none"
+readonly STORAGE_2A_LVM_NAME="none"
+readonly STORAGE_2A_LVM_GROUP="none"
+readonly STORAGE_2A_UUID="none"
+readonly STORAGE_2A_KEY_FILE="none"
+readonly STORAGE_2A_ENCRYPTION_TYPE="luks"
+readonly STORAGE_2A_OWNER_USER="none"
+readonly STORAGE_2A_OWNER_GROUP="none"
+readonly STORAGE_2A_MOUNT_OPTIONS="defaults"
+readonly STORAGE_2B_MOUNT="none"
+readonly STORAGE_2B_MAPPER="none"
+readonly STORAGE_2B_LVM_NAME="none"
+readonly STORAGE_2B_LVM_GROUP="none"
+readonly STORAGE_2B_UUID="none"
+readonly STORAGE_2B_KEY_FILE="none"
+readonly STORAGE_2B_ENCRYPTION_TYPE="luks"
+readonly STORAGE_2B_OWNER_USER="none"
+readonly STORAGE_2B_OWNER_GROUP="none"
+readonly STORAGE_2B_MOUNT_OPTIONS="defaults"
 readonly NETWORK_SHARE_PROTOCOL="nfs"
 readonly NETWORK_SHARE_ADDRESS="localhost:/tmp/test_nfs_share"
 readonly NETWORK_SHARE_CREDENTIALS="none"
@@ -688,8 +781,7 @@ EOF
         fail_test "srv-ctl.sh stop failed for NFS"
     fi
 
-    # Cleanup NFS
-    sudo bash "$PROJECT_ROOT/tests/fixtures/cleanup-nfs-test.sh"
+    # NFS cleanup not needed - services configured via cloud-init stay running
 }
 
 # Main

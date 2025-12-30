@@ -74,6 +74,29 @@ cd bats-core-1.13.0
 sudo ./install.sh /usr/local
 cd /tmp/srv-ctl-test
 
+# Verify Samba and NFS services are running (configured via cloud-init)
+echo "[INFO] Verifying network share services..."
+if systemctl is-active --quiet smbd && systemctl is-active --quiet nfs-server; then
+    echo "[INFO] ✓ Samba and NFS services are running"
+else
+    echo "[WARN] Some services may not be running:"
+    systemctl is-active smbd || echo "  - smbd: not active"
+    systemctl is-active nfs-server || echo "  - nfs-server: not active"
+fi
+
+# Verify shares are accessible
+if smbclient -L localhost -N 2>/dev/null | grep -q testshare; then
+    echo "[INFO] ✓ Samba share available"
+else
+    echo "[WARN] ✗ Samba share not visible"
+fi
+
+if showmount -e localhost 2>/dev/null | grep -q /tmp/test_nfs_share; then
+    echo "[INFO] ✓ NFS export available"
+else
+    echo "[WARN] ✗ NFS export not visible"
+fi
+
 # Run all test phases
 echo "========================================="
 echo "Running integration test suite in VM"

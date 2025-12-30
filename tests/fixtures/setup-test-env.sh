@@ -79,7 +79,12 @@ install_dependencies() {
             ntfs-3g \
             exfat-fuse \
             "$exfat_pkg" \
-            util-linux
+            util-linux \
+            samba \
+            samba-common-bin \
+            cifs-utils \
+            nfs-kernel-server \
+            nfs-common
     elif command -v yum &> /dev/null; then
         yum install -y -q \
             cryptsetup \

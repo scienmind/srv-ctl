@@ -73,17 +73,57 @@ packages:
   - exfat-fuse
   - exfatprogs
   - cifs-utils
+  - libkeyutils1
+  - keyutils
+  - libwbclient0
   - nfs-common
   - curl
+  - samba
+  - samba-common-bin
+  - nfs-kernel-server
+
+package_update: true
+package_upgrade: false
 
 runcmd:
+  # Update library cache before starting services
+  - ldconfig
   - systemctl restart sshd
+  # Setup Samba test user and share
+  - useradd -M testuser 2>/dev/null || true
+  - echo -e "testpass\ntestpass" | smbpasswd -a -s testuser 2>/dev/null || true
+  - mkdir -p /tmp/test_samba_share
+  - chmod 777 /tmp/test_samba_share
+  # Setup NFS test export
+  - mkdir -p /tmp/test_nfs_share
+  - chmod 777 /tmp/test_nfs_share
+  - echo "/tmp/test_nfs_share *(rw,sync,no_subtree_check,insecure)" >> /etc/exports
+  - exportfs -ra || true
+  # Start services
+  - systemctl enable smbd nfs-server || true
+  - systemctl start smbd nfs-server || true
 
 write_files:
   - path: /etc/ssh/sshd_config.d/test.conf
     content: |
       PermitRootLogin yes
       PubkeyAuthentication yes
+    permissions: '0644'
+  - path: /etc/samba/smb.conf
+    content: |
+      [global]
+         workgroup = WORKGROUP
+         security = user
+         map to guest = Bad User
+         bind interfaces only = no
+
+      [testshare]
+         path = /tmp/test_samba_share
+         read only = no
+         guest ok = yes
+         force user = testuser
+         create mask = 0755
+         directory mask = 0755
     permissions: '0644'
 
 final_message: "VM ready for testing"
