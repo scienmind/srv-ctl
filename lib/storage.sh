@@ -294,13 +294,7 @@ function mount_network_path() {
         # Prepend credentials if provided
         if [ "$l_credentials" != "none" ]; then
             l_mount_options="credentials=$l_credentials,$l_mount_options"
-            echo "[DEBUG storage.sh] Credentials file: $l_credentials" >&2
-            ls -la "$l_credentials" >&2 || echo "[DEBUG] Cannot stat credentials file" >&2
         fi
-        
-        # Debug: Show the exact mount command being executed
-        echo "[DEBUG storage.sh] About to execute: mount -t $l_protocol -o $l_mount_options $l_network_path /mnt/$l_mount_path" >&2
-        echo "[DEBUG storage.sh] UID=$UID EUID=$EUID USER=$USER HOME=$HOME" >&2
         
         if ! mount -t "$l_protocol" -o "$l_mount_options" "$l_network_path" "/mnt/$l_mount_path"; then
             echo "ERROR: Failed to mount network path \"$l_network_path\" to \"/mnt/$l_mount_path\""

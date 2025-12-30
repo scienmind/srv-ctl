@@ -73,6 +73,9 @@ run_integration_tests() {
         "$SCRIPT_DIR/integration/test-lvm.sh"
         "$SCRIPT_DIR/integration/test-mount.sh"
         "$SCRIPT_DIR/integration/test-network-shares.bats"
+        "$SCRIPT_DIR/integration/test-luks-keyfile.bats"
+        "$SCRIPT_DIR/integration/test-services.bats"
+        "$SCRIPT_DIR/integration/test-bitlocker.bats"
     )
     
     local failed=0

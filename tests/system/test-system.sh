@@ -636,16 +636,6 @@ password=testpass
 EOF
     chmod 600 /tmp/smb-cred
 
-    # Debug: Check mount.cifs dependencies
-    echo "[DEBUG] Checking mount.cifs binary and dependencies:"
-    which mount.cifs || echo "mount.cifs not in PATH"
-    ldd /sbin/mount.cifs 2>&1 || ldd /usr/sbin/mount.cifs 2>&1 || echo "ldd failed"
-    echo "[DEBUG] Direct mount test:"
-    sudo mkdir -p /tmp/direct-test-mount
-    sudo mount -t cifs //localhost/testshare /tmp/direct-test-mount -o credentials=/tmp/smb-cred,vers=3.0 2>&1 && echo "Direct mount SUCCESS" || echo "Direct mount FAILED: $?"
-    sudo umount /tmp/direct-test-mount 2>/dev/null || true
-    sudo rmdir /tmp/direct-test-mount 2>/dev/null || true
-    
     run_test "CIFS: Mount network share via srv-ctl.sh start"
     if sudo bash "$PROJECT_ROOT/srv-ctl.sh" start 2>&1; then
         if mountpoint -q "/mnt/test-cifs"; then
@@ -784,6 +774,186 @@ EOF
     # NFS cleanup not needed - services configured via cloud-init stay running
 }
 
+# Multi-Device Orchestration System Tests
+test_multi_device_system_workflows() {
+    echo ""
+    echo "========================================="
+    echo "System Tests: Multi-Device Orchestration"
+    echo "========================================="
+    echo ""
+
+    # Setup multiple test environments - create additional loop devices
+    log_info "Creating multiple test devices..."
+    
+    # Create 3 additional loop devices (we already have one from setup_system_environment)
+    local loop_device_2=$(sudo losetup -f)
+    local loop_device_3=$(sudo losetup -f --show <(dd if=/dev/zero bs=1M count=100 2>/dev/null))
+    local loop_device_4=$(sudo losetup -f --show <(dd if=/dev/zero bs=1M count=100 2>/dev/null))
+    
+    # Setup LUKS on additional devices
+    echo "test123456" | sudo cryptsetup luksFormat --type luks2 "$loop_device_3" -
+    echo "test123456" | sudo cryptsetup luksFormat --type luks2 "$loop_device_4" -
+    
+    # Get UUIDs
+    local uuid_3=$(sudo cryptsetup luksUUID "$loop_device_3")
+    local uuid_4=$(sudo cryptsetup luksUUID "$loop_device_4")
+    
+    # Create key files
+    echo "test123456" > /tmp/key1a
+    echo "test123456" > /tmp/key1b
+    chmod 600 /tmp/key1a /tmp/key1b
+    
+    # Test 1: All devices enabled (PRIMARY + STORAGE_1A + STORAGE_1B + NETWORK_SHARE)
+    echo "[TEST 1] Multiple devices enabled simultaneously"
+    cat > "$PROJECT_ROOT/config.local" <<EOF
+#!/usr/bin/env bash
+readonly CRYPTSETUP_MIN_VERSION="2.4.0"
+readonly ST_USER_1="none"
+readonly ST_SERVICE_1="none"
+readonly ST_USER_2="none"
+readonly ST_SERVICE_2="none"
+readonly DOCKER_SERVICE="none"
+
+readonly PRIMARY_DATA_UUID="$TEST_LOOP_UUID"
+readonly PRIMARY_DATA_KEY_FILE="$key_file"
+readonly PRIMARY_DATA_ENCRYPTION_TYPE="luks"
+readonly PRIMARY_DATA_MAPPER="$TEST_LV_MAPPER"
+readonly PRIMARY_DATA_LVM_NAME="$TEST_LV_NAME"
+readonly PRIMARY_DATA_LVM_GROUP="$TEST_VG_NAME"
+readonly PRIMARY_DATA_MOUNT="$TEST_MOUNT_POINT"
+readonly PRIMARY_DATA_OWNER_USER="none"
+readonly PRIMARY_DATA_OWNER_GROUP="none"
+readonly PRIMARY_DATA_MOUNT_OPTIONS="defaults"
+
+readonly STORAGE_1A_UUID="$uuid_3"
+readonly STORAGE_1A_KEY_FILE="/tmp/key1a"
+readonly STORAGE_1A_ENCRYPTION_TYPE="luks"
+readonly STORAGE_1A_MAPPER="test_mapper_1a"
+readonly STORAGE_1A_LVM_NAME="none"
+readonly STORAGE_1A_LVM_GROUP="none"
+readonly STORAGE_1A_MOUNT="test_storage_1a"
+readonly STORAGE_1A_OWNER_USER="none"
+readonly STORAGE_1A_OWNER_GROUP="none"
+readonly STORAGE_1A_MOUNT_OPTIONS="defaults"
+
+readonly STORAGE_1B_UUID="$uuid_4"
+readonly STORAGE_1B_KEY_FILE="/tmp/key1b"
+readonly STORAGE_1B_ENCRYPTION_TYPE="luks"
+readonly STORAGE_1B_MAPPER="test_mapper_1b"
+readonly STORAGE_1B_LVM_NAME="none"
+readonly STORAGE_1B_LVM_GROUP="none"
+readonly STORAGE_1B_MOUNT="test_storage_1b"
+readonly STORAGE_1B_OWNER_USER="none"
+readonly STORAGE_1B_OWNER_GROUP="none"
+readonly STORAGE_1B_MOUNT_OPTIONS="defaults"
+
+readonly STORAGE_2A_UUID="none"
+readonly STORAGE_2A_KEY_FILE="none"
+readonly STORAGE_2A_ENCRYPTION_TYPE="luks"
+readonly STORAGE_2A_MAPPER="none"
+readonly STORAGE_2A_LVM_NAME="none"
+readonly STORAGE_2A_LVM_GROUP="none"
+readonly STORAGE_2A_MOUNT="none"
+readonly STORAGE_2A_OWNER_USER="none"
+readonly STORAGE_2A_OWNER_GROUP="none"
+readonly STORAGE_2A_MOUNT_OPTIONS="defaults"
+
+readonly STORAGE_2B_UUID="none"
+readonly STORAGE_2B_KEY_FILE="none"
+readonly STORAGE_2B_ENCRYPTION_TYPE="luks"
+readonly STORAGE_2B_MAPPER="none"
+readonly STORAGE_2B_LVM_NAME="none"
+readonly STORAGE_2B_LVM_GROUP="none"
+readonly STORAGE_2B_MOUNT="none"
+readonly STORAGE_2B_OWNER_USER="none"
+readonly STORAGE_2B_OWNER_GROUP="none"
+readonly STORAGE_2B_MOUNT_OPTIONS="defaults"
+
+readonly NETWORK_SHARE_PROTOCOL="nfs"
+readonly NETWORK_SHARE_ADDRESS="localhost:/tmp/test_nfs_share"
+readonly NETWORK_SHARE_CREDENTIALS="none"
+readonly NETWORK_SHARE_MOUNT="test-multi-nfs"
+readonly NETWORK_SHARE_OWNER_USER="none"
+readonly NETWORK_SHARE_OWNER_GROUP="none"
+readonly NETWORK_SHARE_OPTIONS="rw,sync"
+EOF
+
+    run_test "Multi-device: Start all devices (3 LUKS + 1 NFS)"
+    if sudo bash "$PROJECT_ROOT/srv-ctl.sh" start 2>&1; then
+        local all_mounted=true
+        
+        # Check PRIMARY
+        if ! mountpoint -q "/mnt/$TEST_MOUNT_POINT"; then
+            log_fail "PRIMARY device not mounted"
+            all_mounted=false
+        fi
+        
+        # Check STORAGE_1A
+        if ! mountpoint -q "/mnt/test_storage_1a"; then
+            log_fail "STORAGE_1A not mounted"
+            all_mounted=false
+        fi
+        
+        # Check STORAGE_1B
+        if ! mountpoint -q "/mnt/test_storage_1b"; then
+            log_fail "STORAGE_1B not mounted"
+            all_mounted=false
+        fi
+        
+        # Check NETWORK_SHARE
+        if ! mountpoint -q "/mnt/test-multi-nfs"; then
+            log_fail "NETWORK_SHARE not mounted"
+            all_mounted=false
+        fi
+        
+        if [ "$all_mounted" = true ]; then
+            pass_test "All 4 devices mounted successfully"
+            
+            # Test I/O on all devices
+            run_test "Multi-device: I/O test on all devices"
+            local io_success=true
+            echo "test1" | sudo tee "/mnt/$TEST_MOUNT_POINT/test.txt" > /dev/null || io_success=false
+            echo "test2" | sudo tee "/mnt/test_storage_1a/test.txt" > /dev/null || io_success=false
+            echo "test3" | sudo tee "/mnt/test_storage_1b/test.txt" > /dev/null || io_success=false
+            echo "test4" | sudo tee "/mnt/test-multi-nfs/test.txt" > /dev/null || io_success=false
+            
+            if [ "$io_success" = true ]; then
+                pass_test "I/O works on all devices"
+            else
+                fail_test "I/O failed on one or more devices"
+            fi
+        else
+            fail_test "Not all devices mounted"
+        fi
+    else
+        fail_test "srv-ctl.sh start failed for multi-device"
+    fi
+
+    run_test "Multi-device: Stop all devices"
+    if sudo bash "$PROJECT_ROOT/srv-ctl.sh" stop 2>&1; then
+        local all_unmounted=true
+        mountpoint -q "/mnt/$TEST_MOUNT_POINT" && all_unmounted=false
+        mountpoint -q "/mnt/test_storage_1a" && all_unmounted=false
+        mountpoint -q "/mnt/test_storage_1b" && all_unmounted=false
+        mountpoint -q "/mnt/test-multi-nfs" && all_unmounted=false
+        
+        if [ "$all_unmounted" = true ]; then
+            pass_test "All devices unmounted successfully"
+        else
+            fail_test "Some devices still mounted"
+        fi
+    else
+        fail_test "srv-ctl.sh stop failed for multi-device"
+    fi
+
+    # Cleanup additional devices
+    sudo cryptsetup close test_mapper_1a 2>/dev/null || true
+    sudo cryptsetup close test_mapper_1b 2>/dev/null || true
+    sudo losetup -d "$loop_device_3" 2>/dev/null || true
+    sudo losetup -d "$loop_device_4" 2>/dev/null || true
+    sudo rm -f /tmp/key1a /tmp/key1b
+}
+
 # Main
 main() {
     echo "========================================="
@@ -824,6 +994,9 @@ main() {
 
         # Run real network share system tests (CIFS/NFS)
         test_network_share_system_workflows
+
+        # Run multi-device orchestration tests
+        test_multi_device_system_workflows
 
         cleanup_system_environment
     else
