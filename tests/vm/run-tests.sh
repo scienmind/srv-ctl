@@ -55,6 +55,7 @@ cp tests/fixtures/config.local.test config.local
 chmod +x srv-ctl.sh
 chmod +x tests/run-tests.sh
 chmod +x tests/integration/*.sh
+chmod +x tests/integration/*.bats
 chmod +x tests/fixtures/*.sh
 chmod +x tests/system/*.sh
 

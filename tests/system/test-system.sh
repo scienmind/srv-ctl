@@ -783,25 +783,46 @@ test_multi_device_system_workflows() {
     echo ""
 
     # Setup multiple test environments - create additional loop devices
-    log_info "Creating multiple test devices..."
+    echo "Creating multiple test devices..."
     
-    # Create 3 additional loop devices (we already have one from setup_system_environment)
-    local loop_device_2=$(sudo losetup -f)
-    local loop_device_3=$(sudo losetup -f --show <(dd if=/dev/zero bs=1M count=100 2>/dev/null))
-    local loop_device_4=$(sudo losetup -f --show <(dd if=/dev/zero bs=1M count=100 2>/dev/null))
+    # Create temporary files for loop devices
+    local temp_file_3="/tmp/test-loop-device-3.img"
+    local temp_file_4="/tmp/test-loop-device-4.img"
+    dd if=/dev/zero of="$temp_file_3" bs=1M count=100 2>/dev/null
+    dd if=/dev/zero of="$temp_file_4" bs=1M count=100 2>/dev/null
+    
+    # Setup loop devices
+    local loop_device_3
+    local loop_device_4
+    loop_device_3=$(sudo losetup -f --show "$temp_file_3")
+    loop_device_4=$(sudo losetup -f --show "$temp_file_4")
     
     # Setup LUKS on additional devices
-    echo "test123456" | sudo cryptsetup luksFormat --type luks2 "$loop_device_3" -
-    echo "test123456" | sudo cryptsetup luksFormat --type luks2 "$loop_device_4" -
+    echo -n "test123456" | sudo cryptsetup luksFormat --type luks2 "$loop_device_3" -
+    echo -n "test123456" | sudo cryptsetup luksFormat --type luks2 "$loop_device_4" -
+    
+    # Unlock devices and create filesystems
+    echo -n "test123456" | sudo cryptsetup luksOpen "$loop_device_3" temp_mapper_3 -
+    echo -n "test123456" | sudo cryptsetup luksOpen "$loop_device_4" temp_mapper_4 -
+    sudo mkfs.ext4 -q /dev/mapper/temp_mapper_3
+    sudo mkfs.ext4 -q /dev/mapper/temp_mapper_4
+    sudo cryptsetup close temp_mapper_3
+    sudo cryptsetup close temp_mapper_4
     
     # Get UUIDs
-    local uuid_3=$(sudo cryptsetup luksUUID "$loop_device_3")
-    local uuid_4=$(sudo cryptsetup luksUUID "$loop_device_4")
+    local uuid_3
+    local uuid_4
+    uuid_3=$(sudo cryptsetup luksUUID "$loop_device_3")
+    uuid_4=$(sudo cryptsetup luksUUID "$loop_device_4")
     
     # Create key files
-    echo "test123456" > /tmp/key1a
-    echo "test123456" > /tmp/key1b
+    echo -n "test123456" > /tmp/key1a
+    echo -n "test123456" > /tmp/key1b
     chmod 600 /tmp/key1a /tmp/key1b
+    
+    # Add keyfiles to LUKS devices
+    echo -n "test123456" | sudo cryptsetup luksAddKey "$loop_device_3" /tmp/key1a -
+    echo -n "test123456" | sudo cryptsetup luksAddKey "$loop_device_4" /tmp/key1b -
     
     # Test 1: All devices enabled (PRIMARY + STORAGE_1A + STORAGE_1B + NETWORK_SHARE)
     echo "[TEST 1] Multiple devices enabled simultaneously"
@@ -815,7 +836,7 @@ readonly ST_SERVICE_2="none"
 readonly DOCKER_SERVICE="none"
 
 readonly PRIMARY_DATA_UUID="$TEST_LOOP_UUID"
-readonly PRIMARY_DATA_KEY_FILE="$key_file"
+readonly PRIMARY_DATA_KEY_FILE="/tmp/test_key.key"
 readonly PRIMARY_DATA_ENCRYPTION_TYPE="luks"
 readonly PRIMARY_DATA_MAPPER="$TEST_LV_MAPPER"
 readonly PRIMARY_DATA_LVM_NAME="$TEST_LV_NAME"
@@ -884,25 +905,25 @@ EOF
         
         # Check PRIMARY
         if ! mountpoint -q "/mnt/$TEST_MOUNT_POINT"; then
-            log_fail "PRIMARY device not mounted"
+            echo "[FAIL] PRIMARY device not mounted"
             all_mounted=false
         fi
         
         # Check STORAGE_1A
         if ! mountpoint -q "/mnt/test_storage_1a"; then
-            log_fail "STORAGE_1A not mounted"
+            echo "[FAIL] STORAGE_1A not mounted"
             all_mounted=false
         fi
         
         # Check STORAGE_1B
         if ! mountpoint -q "/mnt/test_storage_1b"; then
-            log_fail "STORAGE_1B not mounted"
+            echo "[FAIL] STORAGE_1B not mounted"
             all_mounted=false
         fi
         
         # Check NETWORK_SHARE
         if ! mountpoint -q "/mnt/test-multi-nfs"; then
-            log_fail "NETWORK_SHARE not mounted"
+            echo "[FAIL] NETWORK_SHARE not mounted"
             all_mounted=false
         fi
         
@@ -952,6 +973,7 @@ EOF
     sudo losetup -d "$loop_device_3" 2>/dev/null || true
     sudo losetup -d "$loop_device_4" 2>/dev/null || true
     sudo rm -f /tmp/key1a /tmp/key1b
+    sudo rm -f /tmp/test-loop-device-3.img /tmp/test-loop-device-4.img
 }
 
 # Main
