@@ -76,6 +76,9 @@ run_integration_tests() {
         "$SCRIPT_DIR/integration/test-luks-keyfile.bats"
         "$SCRIPT_DIR/integration/test-services.bats"
         "$SCRIPT_DIR/integration/test-bitlocker.bats"
+        "$SCRIPT_DIR/integration/test-error-recovery.bats"
+        "$SCRIPT_DIR/integration/test-config-validation.bats"
+        "$SCRIPT_DIR/integration/test-ownership.bats"
     )
     
     local failed=0

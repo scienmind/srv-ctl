@@ -11,9 +11,26 @@ setup_file() {
     export SUCCESS=0
     export FAILURE=1
     
+    # Detect OS for platform-specific expectations
+    local should_have_bitlocker=false
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        # Ubuntu 22.04+ and Debian 12+ should have cryptsetup 2.4.0+ available
+        if [[ "$ID" == "ubuntu" && "${VERSION_ID%%.*}" -ge 22 ]] || \
+           [[ "$ID" == "debian" && "${VERSION_ID%%.*}" -ge 12 ]]; then
+            should_have_bitlocker=true
+        fi
+    fi
+    
     # Check if cryptsetup supports BitLocker
     if ! cryptsetup --help | grep -q "bitlk"; then
-        skip "cryptsetup does not support BitLocker (requires 2.4.0+)"
+        if [ "$should_have_bitlocker" = true ]; then
+            echo "ERROR: BitLocker support not available on $ID $VERSION_ID" >&2
+            echo "ERROR: This platform should have cryptsetup 2.4.0+ available" >&2
+            return 1
+        else
+            skip "BitLocker support not available in cryptsetup (requires 2.4.0+)"
+        fi
     fi
     
     # Create a test BitLocker image
@@ -31,12 +48,35 @@ setup_file() {
     
     # Format as BitLocker using cryptsetup's bitlk support
     # Note: This creates a BitLocker-compatible container
-    echo "$TEST_BITLOCKER_PASSWORD" | sudo cryptsetup luksFormat --type bitlk "$TEST_BITLOCKER_LOOP" - 2>/dev/null || {
-        # If bitlk formatting fails, skip all tests
+    if ! echo "$TEST_BITLOCKER_PASSWORD" | sudo cryptsetup luksFormat --type bitlk "$TEST_BITLOCKER_LOOP" - 2>&1 | tee /tmp/bitlk-format-error.log; then
+        # If bitlk formatting fails, BitLocker is not supported
+        echo "ERROR: Failed to create BitLocker test device" >&2
+        echo "Cryptsetup output:" >&2
+        cat /tmp/bitlk-format-error.log >&2
+        echo "Cryptsetup version:" >&2
+        sudo cryptsetup --version >&2
+        echo "Available types:" >&2
+        sudo cryptsetup --help 2>&1 | grep -A10 "supported" >&2 || true
         sudo losetup -d "$TEST_BITLOCKER_LOOP" 2>/dev/null || true
         rm -f "$TEST_BITLOCKER_IMAGE"
-        skip "Failed to create BitLocker test device (bitlk not supported)"
-    }
+        
+        # Determine if this should be a failure or skip
+        local should_have_bitlocker=false
+        if [ -f /etc/os-release ]; then
+            . /etc/os-release
+            if [[ "$ID" == "ubuntu" && "${VERSION_ID%%.*}" -ge 22 ]] || \
+               [[ "$ID" == "debian" && "${VERSION_ID%%.*}" -ge 12 ]]; then
+                should_have_bitlocker=true
+            fi
+        fi
+        
+        if [ "$should_have_bitlocker" = true ]; then
+            echo "ERROR: BitLocker formatting failed on $ID $VERSION_ID" >&2
+            return 1
+        else
+            skip "BitLocker support not available in cryptsetup"
+        fi
+    fi
     
     # Get UUID
     export TEST_BITLOCKER_UUID=$(sudo cryptsetup luksUUID "$TEST_BITLOCKER_LOOP")

@@ -67,6 +67,7 @@ users:
 
 packages:
   - cryptsetup
+  - cryptsetup-bin
   - lvm2
   - dosfstools
   - ntfs-3g
@@ -83,9 +84,14 @@ packages:
   - nfs-kernel-server
 
 package_update: true
-package_upgrade: false
+package_upgrade: true
 
 runcmd:
+  # Verify cryptsetup version and BitLocker support
+  - echo "[INFO] Cryptsetup version:" >> /var/log/cloud-init-output.log
+  - cryptsetup --version >> /var/log/cloud-init-output.log 2>&1
+  - echo "[INFO] Cryptsetup supported formats:" >> /var/log/cloud-init-output.log
+  - cryptsetup --help | grep -A 20 "supported" >> /var/log/cloud-init-output.log 2>&1 || true
   # Update library cache before starting services
   - ldconfig
   - systemctl restart sshd

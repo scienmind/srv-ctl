@@ -976,6 +976,188 @@ EOF
     sudo rm -f /tmp/test-loop-device-3.img /tmp/test-loop-device-4.img
 }
 
+# Test: Mixed LUKS + BitLocker in same configuration
+test_mixed_encryption_types() {
+    echo ""
+    echo "========================================="
+    echo "System Tests: Mixed LUKS + BitLocker"
+    echo "========================================="
+    echo ""
+
+    # Check if running as root
+    if [ "$EUID" -ne 0 ]; then
+        echo "Skipping mixed encryption test (requires root)"
+        return 0
+    fi
+
+    # Check if BitLocker is supported
+    local should_have_bitlocker=false
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        # Ubuntu 22.04+ and Debian 12+ should have cryptsetup 2.4.0+ available
+        if [[ "$ID" == "ubuntu" && ${VERSION_ID%%.*} -ge 22 ]] || \
+           [[ "$ID" == "debian" && ${VERSION_ID%%.*} -ge 12 ]]; then
+            should_have_bitlocker=true
+        fi
+    fi
+    
+    if ! cryptsetup --help 2>&1 | grep -q "bitlk"; then
+        if [ "$should_have_bitlocker" = true ]; then
+            echo "ERROR: BitLocker support not available on $ID $VERSION_ID"
+            echo "ERROR: This platform should have cryptsetup 2.4.0+ available"
+            fail_test "BitLocker support required for mixed encryption test"
+            return 1
+        else
+            echo "Skipping mixed encryption test (BitLocker support not available)"
+            return 0
+        fi
+    fi
+    
+    # Verify required variables are set
+    if [ -z "$TEST_LOOP_UUID" ] || [ -z "$PROJECT_ROOT" ]; then
+        echo "ERROR: Required test environment variables not set"
+        return 1
+    fi
+
+    echo "Creating mixed encryption test devices..."
+    
+    # Create temporary files for loop devices
+    local temp_file_luks="/tmp/test-mixed-luks.img"
+    local temp_file_bitlk="/tmp/test-mixed-bitlk.img"
+    dd if=/dev/zero of="$temp_file_luks" bs=1M count=100 2>/dev/null
+    dd if=/dev/zero of="$temp_file_bitlk" bs=1M count=100 2>/dev/null
+    
+    # Setup loop devices
+    local loop_device_luks
+    local loop_device_bitlk
+    loop_device_luks=$(sudo losetup -f --show "$temp_file_luks")
+    loop_device_bitlk=$(sudo losetup -f --show "$temp_file_bitlk")
+    
+    # Format one as LUKS, one as BitLocker
+    echo -n "test123456" | sudo cryptsetup luksFormat --type luks2 "$loop_device_luks" - || {
+        echo "ERROR: Failed to format LUKS device"
+        sudo losetup -d "$loop_device_luks" "$loop_device_bitlk" 2>/dev/null || true
+        rm -f "$temp_file_luks" "$temp_file_bitlk"
+        return 1
+    }
+    echo -n "test123456" | sudo cryptsetup luksFormat --type bitlk "$loop_device_bitlk" - || {
+        echo "ERROR: Failed to format BitLocker device"
+        sudo cryptsetup luksFormat --type bitlk "$loop_device_bitlk" - <<< "test123456" 2>&1 | head -20
+        sudo losetup -d "$loop_device_luks" "$loop_device_bitlk" 2>/dev/null || true
+        rm -f "$temp_file_luks" "$temp_file_bitlk"
+        return 1
+    }
+    
+    # Create key files
+    echo -n "test123456" > /tmp/key_luks
+    echo -n "test123456" > /tmp/key_bitlk
+    chmod 600 /tmp/key_luks /tmp/key_bitlk
+    
+    # Add keyfiles to devices
+    echo -n "test123456" | sudo cryptsetup luksAddKey "$loop_device_luks" /tmp/key_luks -
+    echo -n "test123456" | sudo cryptsetup luksAddKey "$loop_device_bitlk" /tmp/key_bitlk -
+    
+    # Unlock and create filesystems
+    echo -n "test123456" | sudo cryptsetup luksOpen "$loop_device_luks" temp_mapper_luks -
+    echo -n "test123456" | sudo cryptsetup open --type bitlk "$loop_device_bitlk" temp_mapper_bitlk -
+    sudo mkfs.ext4 -q /dev/mapper/temp_mapper_luks
+    sudo mkfs.ext4 -q /dev/mapper/temp_mapper_bitlk
+    sudo cryptsetup close temp_mapper_luks
+    sudo cryptsetup close temp_mapper_bitlk
+    
+    # Get UUIDs
+    local uuid_luks
+    local uuid_bitlk
+    uuid_luks=$(sudo cryptsetup luksUUID "$loop_device_luks")
+    uuid_bitlk=$(sudo cryptsetup luksUUID "$loop_device_bitlk")
+    
+    # Test: Configuration with mixed encryption types
+    echo "[TEST] Mixed LUKS + BitLocker configuration"
+    cat > "$PROJECT_ROOT/config.local" <<EOF
+#!/usr/bin/env bash
+readonly CRYPTSETUP_MIN_VERSION="2.4.0"
+readonly ST_USER_1="none"
+readonly ST_SERVICE_1="none"
+readonly ST_USER_2="none"
+readonly ST_SERVICE_2="none"
+readonly DOCKER_SERVICE="none"
+
+readonly PRIMARY_DATA_UUID="$TEST_LOOP_UUID"
+readonly PRIMARY_DATA_KEY_FILE="/tmp/test_key.key"
+readonly PRIMARY_DATA_ENCRYPTION_TYPE="luks"
+readonly PRIMARY_DATA_MAPPER="$TEST_LV_MAPPER"
+readonly PRIMARY_DATA_LVM_NAME="$TEST_LV_NAME"
+readonly PRIMARY_DATA_LVM_GROUP="$TEST_VG_NAME"
+readonly PRIMARY_DATA_MOUNT="$TEST_MOUNT_POINT"
+readonly PRIMARY_DATA_OWNER_USER="none"
+readonly PRIMARY_DATA_OWNER_GROUP="none"
+readonly PRIMARY_DATA_MOUNT_OPTIONS="defaults"
+
+readonly STORAGE_1A_UUID="$uuid_bitlk"
+readonly STORAGE_1A_KEY_FILE="/tmp/key_bitlk"
+readonly STORAGE_1A_ENCRYPTION_TYPE="bitlocker"
+readonly STORAGE_1A_MAPPER="test_mapper_bitlk"
+readonly STORAGE_1A_LVM_NAME="none"
+readonly STORAGE_1A_LVM_GROUP="none"
+readonly STORAGE_1A_MOUNT="test_storage_bitlk"
+readonly STORAGE_1A_OWNER_USER="none"
+readonly STORAGE_1A_OWNER_GROUP="none"
+readonly STORAGE_1A_MOUNT_OPTIONS="defaults"
+
+readonly STORAGE_1B_UUID="none"
+readonly STORAGE_2A_UUID="none"
+readonly STORAGE_2B_UUID="none"
+
+readonly NETWORK_SHARE_PROTOCOL="none"
+readonly NETWORK_SHARE_ADDRESS="none"
+readonly NETWORK_SHARE_CREDENTIALS="none"
+readonly NETWORK_SHARE_MOUNT="none"
+readonly NETWORK_SHARE_OWNER_USER="none"
+readonly NETWORK_SHARE_OWNER_GROUP="none"
+readonly NETWORK_SHARE_OPTIONS="defaults"
+EOF
+
+    run_test "Mixed encryption: Start with LUKS + BitLocker"
+    if sudo bash "$PROJECT_ROOT/srv-ctl.sh" start 2>&1; then
+        # Verify both devices mounted
+        local both_mounted=true
+        mountpoint -q "/mnt/$TEST_MOUNT_POINT" || both_mounted=false
+        mountpoint -q "/mnt/test_storage_bitlk" || both_mounted=false
+        
+        if [ "$both_mounted" = true ]; then
+            pass_test "Both LUKS and BitLocker devices mounted"
+        else
+            fail_test "Not all devices mounted"
+            return 1
+        fi
+    else
+        fail_test "srv-ctl.sh start failed for mixed encryption"
+        return 1
+    fi
+
+    run_test "Mixed encryption: Stop both devices"
+    if sudo bash "$PROJECT_ROOT/srv-ctl.sh" stop 2>&1; then
+        local both_unmounted=true
+        mountpoint -q "/mnt/$TEST_MOUNT_POINT" && both_unmounted=false
+        mountpoint -q "/mnt/test_storage_bitlk" && both_unmounted=false
+        
+        if [ "$both_unmounted" = true ]; then
+            pass_test "Both devices unmounted successfully"
+        else
+            fail_test "Some devices still mounted"
+        fi
+    else
+        fail_test "srv-ctl.sh stop failed"
+    fi
+
+    # Cleanup
+    sudo cryptsetup close test_mapper_bitlk 2>/dev/null || true
+    sudo losetup -d "$loop_device_luks" 2>/dev/null || true
+    sudo losetup -d "$loop_device_bitlk" 2>/dev/null || true
+    sudo rm -f /tmp/key_luks /tmp/key_bitlk
+    sudo rm -f "$temp_file_luks" "$temp_file_bitlk"
+}
+
 # Main
 main() {
     echo "========================================="
@@ -1019,6 +1201,9 @@ main() {
 
         # Run multi-device orchestration tests
         test_multi_device_system_workflows
+        
+        # Run mixed LUKS + BitLocker test
+        test_mixed_encryption_types
 
         cleanup_system_environment
     else

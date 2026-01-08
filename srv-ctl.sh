@@ -112,7 +112,7 @@ function open_device() {
     unlock_device "$l_uuid" "$l_mapper" "$l_key_file" "$l_encryption_type" || return "$FAILURE"
 
     # Step 3: Mount device
-    mount_device "$l_mapper" "$l_mount" "$l_mount_options" || return "$FAILURE"
+    mount_device "$l_mapper" "$l_mount" "$l_mount_options" "$l_owner_user" "$l_owner_group" || return "$FAILURE"
 }
 
 function close_device() {
@@ -376,6 +376,8 @@ function validate_config() {
     echo ""
     echo "Storage Devices:"
     local enabled=0
+    local -A mapper_names  # Track mapper names to detect duplicates
+    
     for device in "Primary:PRIMARY_DATA" "1A:STORAGE_1A" "1B:STORAGE_1B" "2A:STORAGE_2A" "2B:STORAGE_2B"; do
         IFS=':' read -r label prefix <<< "$device"
         local uuid_var="${prefix}_UUID"
@@ -384,6 +386,18 @@ function validate_config() {
         if [ "$uuid" != "none" ]; then
             if _validate_device "$label" "$prefix"; then
                 enabled=$((enabled + 1))
+                
+                # Check for mapper name conflicts
+                local mapper_var="${prefix}_MAPPER"
+                local mapper="${!mapper_var:-none}"
+                if [ "$mapper" != "none" ]; then
+                    if [ -n "${mapper_names[$mapper]+_}" ]; then
+                        echo "❌ Mapper conflict: '$mapper' used by both ${mapper_names[$mapper]} and $label"
+                        errors=$((errors + 1))
+                    else
+                        mapper_names[$mapper]=$label
+                    fi
+                fi
             else
                 errors=$((errors + 1))
             fi
@@ -440,9 +454,13 @@ function _validate_device() {
     local label=$1 prefix=$2
     local encryption_var="${prefix}_ENCRYPTION_TYPE" 
     local key_file_var="${prefix}_KEY_FILE"
+    local owner_user_var="${prefix}_OWNER_USER"
+    local owner_group_var="${prefix}_OWNER_GROUP"
     
     local encryption="${!encryption_var:-luks}"
     local key_file="${!key_file_var:-none}"
+    local owner_user="${!owner_user_var:-none}"
+    local owner_group="${!owner_group_var:-none}"
     
     local has_errors=false
     local error_details=""
@@ -469,6 +487,30 @@ function _validate_device() {
         fi
     else
         key_status=" (interactive)"
+    fi
+    
+    # Validate owner user
+    if [ "$owner_user" != "none" ]; then
+        if ! id "$owner_user" &>/dev/null; then
+            if [ "$has_errors" = true ]; then
+                error_details="$error_details, user '$owner_user' does not exist"
+            else
+                error_details="user '$owner_user' does not exist"
+            fi
+            has_errors=true
+        fi
+    fi
+    
+    # Validate owner group
+    if [ "$owner_group" != "none" ]; then
+        if ! getent group "$owner_group" &>/dev/null; then
+            if [ "$has_errors" = true ]; then
+                error_details="$error_details, group '$owner_group' does not exist"
+            else
+                error_details="group '$owner_group' does not exist"
+            fi
+            has_errors=true
+        fi
     fi
     
     if [ "$has_errors" = true ]; then

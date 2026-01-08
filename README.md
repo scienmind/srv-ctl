@@ -8,7 +8,8 @@ Small utility to manage home server services dependent on encrypted storage.
 - **Multiple Storage Devices**: Supports 5 storage devices (1 primary data + 4 paired storage devices)
 - **Dual Encryption Support**: Supports both LUKS and BitLocker encryption formats
 - **LVM Support**: Optional LVM (Logical Volume Manager) support for device management
-- **Network Storage**: CIFS/SMB network share mounting support
+- **Network Storage**: CIFS/SMB and NFS network share mounting support
+- **Service Management**: Start/stop systemd services with error handling and idempotency
 - **Configuration Validation**: Built-in validation to verify setup before execution
 
 ## Requirements

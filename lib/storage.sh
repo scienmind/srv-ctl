@@ -25,6 +25,9 @@
 #     - unmount_device()           - Unmount a mount point
 #     - mount_network_path()       - Mount network share (CIFS/NFS)
 #
+#   Ownership:
+#     - mount_device() supports optional owner_user and owner_group parameters
+#
 # DEPENDENCIES:
 #   - cryptsetup 2.4.0+ (for LUKS and BitLocker support)
 #   - lvm2 (for LVM operations)
@@ -220,6 +223,8 @@ function mount_device() {
     local l_mapper=$1
     local l_mount=$2
     local l_mount_options=${3:-defaults}
+    local l_owner_user=${4:-none}
+    local l_owner_group=${5:-none}
 
     if [ "$l_mapper" == "none" ] || [ "$l_mount" == "none" ]; then
         echo -e "Mount not configured (mapper=\"$l_mapper\"; mount_point=\"$l_mount\"). Skipping.\n"
@@ -240,6 +245,24 @@ function mount_device() {
             echo "ERROR: Failed to mount \"/dev/mapper/$l_mapper\" to \"/mnt/$l_mount\""
             return "$FAILURE"
         fi
+        
+        # Set ownership if specified
+        if [ "$l_owner_user" != "none" ] || [ "$l_owner_group" != "none" ]; then
+            local chown_target=""
+            if [ "$l_owner_user" != "none" ] && [ "$l_owner_group" != "none" ]; then
+                chown_target="$l_owner_user:$l_owner_group"
+            elif [ "$l_owner_user" != "none" ]; then
+                chown_target="$l_owner_user"
+            else
+                chown_target=":$l_owner_group"
+            fi
+            
+            echo "Setting ownership to $chown_target..."
+            if ! chown "$chown_target" "/mnt/$l_mount"; then
+                echo "WARNING: Failed to set ownership on \"/mnt/$l_mount\""
+            fi
+        fi
+        
         echo -e "Done\n"
     fi
 }
