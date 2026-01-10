@@ -40,8 +40,12 @@
 #
 
 # Constants (use existing values if already defined)
-readonly SUCCESS=${SUCCESS:-0}
-readonly FAILURE=${FAILURE:-1}
+if [[ -z "${SUCCESS+x}" ]]; then
+    readonly SUCCESS=0
+fi
+if [[ -z "${FAILURE+x}" ]]; then
+    readonly FAILURE=1
+fi
 
 # -----------------------------------------------------------------------------
 # Device Waiting
