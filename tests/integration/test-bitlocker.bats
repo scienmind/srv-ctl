@@ -48,19 +48,15 @@ setup_file() {
         export TEST_BITLOCKER_DEVICE="$TEST_BITLOCKER_LOOP"
     fi
     
-    # Create key file
-    echo "$TEST_BITLOCKER_PASSWORD" > "$TEST_BITLOCKER_KEY_FILE"
+    # Create key file (use printf to avoid trailing newline)
+    printf "%s" "$TEST_BITLOCKER_PASSWORD" > "$TEST_BITLOCKER_KEY_FILE"
     chmod 600 "$TEST_BITLOCKER_KEY_FILE"
     
-    # Get UUID - BitLocker devices need blkid, not cryptsetup luksUUID
-    export TEST_BITLOCKER_UUID=$(sudo blkid -s UUID -o value "$TEST_BITLOCKER_DEVICE" 2>/dev/null)
+    # Get UUID - BitLocker devices use GUID from cryptsetup bitlkDump
+    export TEST_BITLOCKER_UUID=$(sudo cryptsetup bitlkDump "$TEST_BITLOCKER_DEVICE" 2>/dev/null | grep "^GUID:" | awk '{print $2}')
     if [ -z "$TEST_BITLOCKER_UUID" ]; then
-        # Fallback: try to extract from filesystem
-        TEST_BITLOCKER_UUID=$(sudo blkid "$TEST_BITLOCKER_DEVICE" 2>/dev/null | grep -o 'UUID="[^"]*"' | cut -d'"' -f2)
-    fi
-    if [ -z "$TEST_BITLOCKER_UUID" ]; then
-        # Last resort: use device path directly
-        TEST_BITLOCKER_UUID="bitlocker-test-device"
+        echo "ERROR: Failed to extract BitLocker GUID from device" >&3
+        exit 1
     fi
     export TEST_BITLOCKER_UUID
     echo "BitLocker UUID: $TEST_BITLOCKER_UUID" >&3
@@ -94,6 +90,7 @@ teardown_file() {
 
 teardown() {
     # Ensure device is closed after each test
+    sudo umount /mnt/test-bitlocker 2>/dev/null || true
     sudo cryptsetup close "$TEST_BITLOCKER_MAPPER" 2>/dev/null || true
 }
 
@@ -194,7 +191,7 @@ readonly PRIMARY_DATA_ENCRYPTION_TYPE="bitlocker"
 readonly PRIMARY_DATA_MAPPER="$TEST_BITLOCKER_MAPPER"
 readonly PRIMARY_DATA_LVM_NAME="none"
 readonly PRIMARY_DATA_LVM_GROUP="none"
-readonly PRIMARY_DATA_MOUNT="none"
+readonly PRIMARY_DATA_MOUNT="/mnt/test-bitlocker"
 readonly PRIMARY_DATA_OWNER_USER="none"
 readonly PRIMARY_DATA_OWNER_GROUP="none"
 readonly PRIMARY_DATA_MOUNT_OPTIONS="defaults"
@@ -249,6 +246,10 @@ EOF
     
     # Test unlock-only command
     run sudo bash "$PROJECT_ROOT/srv-ctl.sh" unlock-only
+    if [ "$status" -ne 0 ]; then
+        echo "srv-ctl.sh unlock-only failed with status: $status" >&3
+        echo "Output: $output" >&3
+    fi
     [ "$status" -eq 0 ]
     
     # Verify device is unlocked

@@ -170,7 +170,11 @@ function unlock_device() {
 
     if [ "$l_encryption_type" == "bitlocker" ]; then
         # BitLocker support using native cryptsetup (v2.4.0+)
-        if [ "$l_key_file" != "none" ] && [ -f "$l_key_file" ]; then
+        if [ "$l_key_file" != "none" ]; then
+            if [ ! -f "$l_key_file" ]; then
+                echo "ERROR: Key file \"$l_key_file\" not found"
+                return "$FAILURE"
+            fi
             if ! cryptsetup open --type bitlk "$l_device_path" "$l_mapper" --key-file="$l_key_file"; then
                 echo "ERROR: Failed to unlock BitLocker device \"$l_device_uuid\" as \"$l_mapper\" using key file"
                 return "$FAILURE"
