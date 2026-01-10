@@ -40,21 +40,35 @@ setup_file() {
         sudo losetup -d "$temp_loop" 2>/dev/null || true
     fi
     
-    # Setup loop device for testing
-    export TEST_BITLOCKER_LOOP=$(sudo losetup -f --show "$TEST_BITLOCKER_IMAGE")
+    # Setup loop device for testing (with partition scanning for disk images)
+    export TEST_BITLOCKER_LOOP=$(sudo losetup -f --show -P "$TEST_BITLOCKER_IMAGE")
+    
+    # If using a disk image with partitions, use partition 1
+    if [ -b "${TEST_BITLOCKER_LOOP}p1" ]; then
+        export TEST_BITLOCKER_DEVICE="${TEST_BITLOCKER_LOOP}p1"
+    else
+        export TEST_BITLOCKER_DEVICE="$TEST_BITLOCKER_LOOP"
+    fi
     
     # Create key file
     echo "$TEST_BITLOCKER_PASSWORD" > "$TEST_BITLOCKER_KEY_FILE"
     chmod 600 "$TEST_BITLOCKER_KEY_FILE"
     
     # Get UUID
-    export TEST_BITLOCKER_UUID=$(sudo cryptsetup luksUUID "$TEST_BITLOCKER_LOOP" 2>/dev/null || echo "00000000-0000-0000-0000-000000000000")
+    export TEST_BITLOCKER_UUID=$(sudo cryptsetup luksUUID "$TEST_BITLOCKER_DEVICE" 2>/dev/null || echo "00000000-0000-0000-0000-000000000000")
+    
+    # Create symlink for UUID-based device lookup (for testing)
+    sudo mkdir -p /dev/disk/by-uuid
+    sudo ln -sf "$TEST_BITLOCKER_DEVICE" "/dev/disk/by-uuid/$TEST_BITLOCKER_UUID" 2>/dev/null || true
     
     # Source the library
     source "$PROJECT_ROOT/lib/storage.sh"
 }
 
 teardown_file() {
+    # Cleanup UUID symlink
+    sudo rm -f "/dev/disk/by-uuid/$TEST_BITLOCKER_UUID" 2>/dev/null || true
+    
     # Cleanup
     sudo cryptsetup close "$TEST_BITLOCKER_MAPPER" 2>/dev/null || true
     sudo losetup -d "$TEST_BITLOCKER_LOOP" 2>/dev/null || true
@@ -76,7 +90,7 @@ teardown() {
 
 @test "BitLocker: Device already unlocked (idempotent)" {
     # Unlock first time
-    echo "$TEST_BITLOCKER_PASSWORD" | sudo cryptsetup open --type bitlk "$TEST_BITLOCKER_LOOP" "$TEST_BITLOCKER_MAPPER"
+    echo "$TEST_BITLOCKER_PASSWORD" | sudo cryptsetup open --type bitlk "$TEST_BITLOCKER_DEVICE" "$TEST_BITLOCKER_MAPPER"
     
     # Try to unlock again
     run sudo bash -c "source $PROJECT_ROOT/lib/storage.sh; unlock_device $TEST_BITLOCKER_UUID $TEST_BITLOCKER_MAPPER $TEST_BITLOCKER_KEY_FILE bitlocker"
@@ -109,7 +123,7 @@ teardown() {
 
 @test "BitLocker: Lock device" {
     # Unlock first
-    echo "$TEST_BITLOCKER_PASSWORD" | sudo cryptsetup open --type bitlk "$TEST_BITLOCKER_LOOP" "$TEST_BITLOCKER_MAPPER"
+    echo "$TEST_BITLOCKER_PASSWORD" | sudo cryptsetup open --type bitlk "$TEST_BITLOCKER_DEVICE" "$TEST_BITLOCKER_MAPPER"
     
     # Verify it's unlocked
     run sudo cryptsetup status "$TEST_BITLOCKER_MAPPER"
