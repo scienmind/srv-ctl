@@ -56,10 +56,19 @@ setup_file() {
     
     # Get UUID
     export TEST_BITLOCKER_UUID=$(sudo cryptsetup luksUUID "$TEST_BITLOCKER_DEVICE" 2>/dev/null || echo "00000000-0000-0000-0000-000000000000")
+    echo "BitLocker UUID: $TEST_BITLOCKER_UUID" >&3
+    echo "BitLocker Device: $TEST_BITLOCKER_DEVICE" >&3
     
     # Create symlink for UUID-based device lookup (for testing)
     sudo mkdir -p /dev/disk/by-uuid
     sudo ln -sf "$TEST_BITLOCKER_DEVICE" "/dev/disk/by-uuid/$TEST_BITLOCKER_UUID" 2>/dev/null || true
+    
+    # Verify symlink was created
+    if [ -L "/dev/disk/by-uuid/$TEST_BITLOCKER_UUID" ]; then
+        echo "UUID symlink created successfully" >&3
+    else
+        echo "WARNING: UUID symlink creation failed" >&3
+    fi
     
     # Source the library
     source "$PROJECT_ROOT/lib/storage.sh"
@@ -83,6 +92,13 @@ teardown() {
 
 @test "BitLocker: Unlock device with key file" {
     run sudo bash -c "source $PROJECT_ROOT/lib/storage.sh; unlock_device $TEST_BITLOCKER_UUID $TEST_BITLOCKER_MAPPER $TEST_BITLOCKER_KEY_FILE bitlocker"
+    if [ "$status" -ne 0 ]; then
+        echo "unlock_device failed with status: $status" >&3
+        echo "Output: $output" >&3
+        echo "UUID: $TEST_BITLOCKER_UUID" >&3
+        echo "Device: $TEST_BITLOCKER_DEVICE" >&3
+        ls -l "/dev/disk/by-uuid/$TEST_BITLOCKER_UUID" >&3 || echo "UUID symlink not found" >&3
+    fi
     [ "$status" -eq 0 ]
     run sudo cryptsetup status "$TEST_BITLOCKER_MAPPER"
     [ "$status" -eq 0 ]
