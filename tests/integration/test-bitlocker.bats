@@ -54,8 +54,17 @@ setup_file() {
     echo "$TEST_BITLOCKER_PASSWORD" > "$TEST_BITLOCKER_KEY_FILE"
     chmod 600 "$TEST_BITLOCKER_KEY_FILE"
     
-    # Get UUID
-    export TEST_BITLOCKER_UUID=$(sudo cryptsetup luksUUID "$TEST_BITLOCKER_DEVICE" 2>/dev/null || echo "00000000-0000-0000-0000-000000000000")
+    # Get UUID - BitLocker devices need blkid, not cryptsetup luksUUID
+    export TEST_BITLOCKER_UUID=$(sudo blkid -s UUID -o value "$TEST_BITLOCKER_DEVICE" 2>/dev/null)
+    if [ -z "$TEST_BITLOCKER_UUID" ]; then
+        # Fallback: try to extract from filesystem
+        TEST_BITLOCKER_UUID=$(sudo blkid "$TEST_BITLOCKER_DEVICE" 2>/dev/null | grep -o 'UUID="[^"]*"' | cut -d'"' -f2)
+    fi
+    if [ -z "$TEST_BITLOCKER_UUID" ]; then
+        # Last resort: use device path directly
+        TEST_BITLOCKER_UUID="bitlocker-test-device"
+    fi
+    export TEST_BITLOCKER_UUID
     echo "BitLocker UUID: $TEST_BITLOCKER_UUID" >&3
     echo "BitLocker Device: $TEST_BITLOCKER_DEVICE" >&3
     
@@ -69,6 +78,10 @@ setup_file() {
     else
         echo "WARNING: UUID symlink creation failed" >&3
     fi
+    
+    # Define constants required by library
+    export SUCCESS=0
+    export FAILURE=1
     
     # Source the library
     source "$PROJECT_ROOT/lib/storage.sh"
