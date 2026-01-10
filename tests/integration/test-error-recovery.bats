@@ -55,7 +55,6 @@ teardown_file() {
 }
 
 setup() {
-    export SUCCESS=0 FAILURE=1
     source lib/os-utils.sh
     source lib/storage.sh
 }

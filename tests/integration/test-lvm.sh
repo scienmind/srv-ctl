@@ -18,8 +18,6 @@ fi
 source /tmp/test_env.conf
 
 # Load libraries
-export SUCCESS=0
-export FAILURE=1
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../../lib/os-utils.sh"
 source "$SCRIPT_DIR/../../lib/storage.sh"

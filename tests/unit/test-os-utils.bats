@@ -4,8 +4,6 @@
 # Setup test environment
 setup() {
     # Load the library under test
-    export SUCCESS=0
-    export FAILURE=1
     source "${BATS_TEST_DIRNAME}/../../lib/os-utils.sh"
 }
 

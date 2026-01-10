@@ -9,8 +9,6 @@ setup_file() {
     export TEST_BITLOCKER_MAPPER="test_bitlocker"
     export TEST_BITLOCKER_PASSWORD="TestBitLocker123"
     export TEST_BITLOCKER_KEY_FILE="/tmp/test-bitlocker-key"
-    export SUCCESS=0
-    export FAILURE=1
     
     # Check if cryptsetup supports BitLocker unlocking
     if ! cryptsetup --help | grep -q "bitlk"; then
@@ -78,10 +76,6 @@ setup_file() {
     else
         echo "WARNING: UUID symlink creation failed" >&3
     fi
-    
-    # Define constants required by library
-    export SUCCESS=0
-    export FAILURE=1
     
     # Source the library
     source "$PROJECT_ROOT/lib/storage.sh"

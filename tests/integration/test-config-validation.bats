@@ -5,7 +5,6 @@
 
 
 setup() {
-    export SUCCESS=0 FAILURE=1
     export PROJECT_ROOT
     PROJECT_ROOT="$(cd "$(dirname "$BATS_TEST_DIRNAME")/.." && pwd)"
     

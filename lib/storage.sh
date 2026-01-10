@@ -36,9 +36,12 @@
 #
 # NOTES:
 #   - Functions return SUCCESS/FAILURE status codes
-#   - Functions expect SUCCESS and FAILURE constants to be defined
 #   - All mount operations use /mnt/ as the base directory
 #
+
+# Constants (use existing values if already defined)
+readonly SUCCESS=${SUCCESS:-0}
+readonly FAILURE=${FAILURE:-1}
 
 # -----------------------------------------------------------------------------
 # Device Waiting

@@ -4,8 +4,6 @@
 # Source the os-utils library that contains service management functions
 setup_file() {
     export PROJECT_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/../.." && pwd)"
-    export SUCCESS=0
-    export FAILURE=1
     
     # Create a test service unit file for testing
     sudo tee /etc/systemd/system/test-dummy-service.service > /dev/null <<EOF
@@ -86,7 +84,7 @@ setup() {
 }
 
 @test "start_service: Service name is 'none'" {
-    run sudo bash -c "export SUCCESS=0 FAILURE=1 && source $PROJECT_ROOT/lib/os-utils.sh && start_service none"
+    run sudo bash -c "source $PROJECT_ROOT/lib/os-utils.sh && start_service none"
     [ "$status" -eq 0 ]
 }
 
@@ -118,11 +116,11 @@ setup() {
 }
 
 @test "stop_service: Service name is 'none'" {
-    run sudo bash -c "export SUCCESS=0 FAILURE=1 && source $PROJECT_ROOT/lib/os-utils.sh && stop_service none"
+    run sudo bash -c "source $PROJECT_ROOT/lib/os-utils.sh && stop_service none"
     [ "$status" -eq 0 ]
 }
 
 @test "stop_service: Empty service name" {
-    run sudo bash -c "export SUCCESS=0 FAILURE=1 && source $PROJECT_ROOT/lib/os-utils.sh && stop_service ''"
+    run sudo bash -c "source $PROJECT_ROOT/lib/os-utils.sh && stop_service ''"
     [ "$status" -ne 0 ]
 }
