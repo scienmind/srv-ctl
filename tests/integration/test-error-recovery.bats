@@ -10,8 +10,8 @@ setup_file() {
     TEST_LOOP_IMG_1="/tmp/test-error-recovery-1.img"
     TEST_LOOP_IMG_2="/tmp/test-error-recovery-2.img"
     
-    dd if=/dev/zero of="$TEST_LOOP_IMG_1" bs=1M count=100 2>/dev/null
-    dd if=/dev/zero of="$TEST_LOOP_IMG_2" bs=1M count=100 2>/dev/null
+    truncate -s 100M "$TEST_LOOP_IMG_1"
+    truncate -s 100M "$TEST_LOOP_IMG_2"
     
     TEST_LOOP_DEV_1=$(sudo losetup -f --show "$TEST_LOOP_IMG_1")
     TEST_LOOP_DEV_2=$(sudo losetup -f --show "$TEST_LOOP_IMG_2")

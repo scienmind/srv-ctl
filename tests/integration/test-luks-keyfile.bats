@@ -7,7 +7,7 @@ setup() {
     export TEST_KEYFILE="/tmp/test_luks_keyfile.key"
     export TEST_WRONG_KEYFILE="/tmp/test_luks_wrong_keyfile.key"
     export TEST_MOUNTPOINT="/mnt/test_luks_mount"
-    dd if=/dev/zero of="$TEST_LOOP_DEV" bs=1M count=32 &>/dev/null
+    truncate -s 32M "$TEST_LOOP_DEV"
     losetup -fP "$TEST_LOOP_DEV"
     LOOPDEV=$(losetup -j "$TEST_LOOP_DEV" | cut -d: -f1)
     echo -n "supersecretkey" > "$TEST_KEYFILE"
