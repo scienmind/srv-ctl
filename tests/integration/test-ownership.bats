@@ -25,7 +25,7 @@ setup_file() {
     
     # Create test loop device
     TEST_LOOP_IMG="/tmp/test-ownership.img"
-    truncate -s 100M "$TEST_LOOP_IMG"
+    dd if=/dev/zero of="$TEST_LOOP_IMG" bs=1M count=100 2>/dev/null
     TEST_LOOP_DEV=$(sudo losetup -f --show "$TEST_LOOP_IMG")
     
     # Format with LUKS
