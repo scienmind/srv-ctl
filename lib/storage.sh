@@ -319,8 +319,7 @@ function mount_network_path() {
         
         # Build mount options from username/groupname
         local l_mount_options
-        l_mount_options=$(build_mount_options "$l_owner_user" "$l_owner_group" "$l_additional_options")
-        if [ $? -ne "$SUCCESS" ]; then
+        if ! l_mount_options=$(build_mount_options "$l_owner_user" "$l_owner_group" "$l_additional_options"); then
             echo "$l_mount_options"  # Print error message
             return "$FAILURE"
         fi

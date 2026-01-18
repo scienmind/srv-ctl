@@ -99,8 +99,7 @@ function open_device() {
 
     # Build mount options from username/groupname
     local l_mount_options
-    l_mount_options=$(build_mount_options "$l_owner_user" "$l_owner_group" "$l_additional_options")
-    if [ $? -ne $SUCCESS ]; then
+    if ! l_mount_options=$(build_mount_options "$l_owner_user" "$l_owner_group" "$l_additional_options"); then
         echo "$l_mount_options"  # Print error message
         return "$FAILURE"
     fi
@@ -141,34 +140,36 @@ function open_all_devices() {
     open_device "$PRIMARY_DATA_MOUNT" "$PRIMARY_DATA_MAPPER" \
         "$PRIMARY_DATA_LVM_NAME" "$PRIMARY_DATA_LVM_GROUP" \
         "$PRIMARY_DATA_UUID" "$PRIMARY_DATA_KEY_FILE" "$PRIMARY_DATA_ENCRYPTION_TYPE" \
-        "$PRIMARY_DATA_OWNER_USER" "$PRIMARY_DATA_OWNER_GROUP" "$PRIMARY_DATA_MOUNT_OPTIONS"
+        "$PRIMARY_DATA_OWNER_USER" "$PRIMARY_DATA_OWNER_GROUP" "$PRIMARY_DATA_MOUNT_OPTIONS" || return "$FAILURE"
 
     # open storage devices for service 1
     open_device "$STORAGE_1A_MOUNT" "$STORAGE_1A_MAPPER" \
         "$STORAGE_1A_LVM_NAME" "$STORAGE_1A_LVM_GROUP" \
         "$STORAGE_1A_UUID" "$STORAGE_1A_KEY_FILE" "$STORAGE_1A_ENCRYPTION_TYPE" \
-        "$STORAGE_1A_OWNER_USER" "$STORAGE_1A_OWNER_GROUP" "$STORAGE_1A_MOUNT_OPTIONS"
+        "$STORAGE_1A_OWNER_USER" "$STORAGE_1A_OWNER_GROUP" "$STORAGE_1A_MOUNT_OPTIONS" || return "$FAILURE"
 
     open_device "$STORAGE_1B_MOUNT" "$STORAGE_1B_MAPPER" \
         "$STORAGE_1B_LVM_NAME" "$STORAGE_1B_LVM_GROUP" \
         "$STORAGE_1B_UUID" "$STORAGE_1B_KEY_FILE" "$STORAGE_1B_ENCRYPTION_TYPE" \
-        "$STORAGE_1B_OWNER_USER" "$STORAGE_1B_OWNER_GROUP" "$STORAGE_1B_MOUNT_OPTIONS"
+        "$STORAGE_1B_OWNER_USER" "$STORAGE_1B_OWNER_GROUP" "$STORAGE_1B_MOUNT_OPTIONS" || return "$FAILURE"
 
     # open storage devices for service 2
     open_device "$STORAGE_2A_MOUNT" "$STORAGE_2A_MAPPER" \
         "$STORAGE_2A_LVM_NAME" "$STORAGE_2A_LVM_GROUP" \
         "$STORAGE_2A_UUID" "$STORAGE_2A_KEY_FILE" "$STORAGE_2A_ENCRYPTION_TYPE" \
-        "$STORAGE_2A_OWNER_USER" "$STORAGE_2A_OWNER_GROUP" "$STORAGE_2A_MOUNT_OPTIONS"
+        "$STORAGE_2A_OWNER_USER" "$STORAGE_2A_OWNER_GROUP" "$STORAGE_2A_MOUNT_OPTIONS" || return "$FAILURE"
 
     open_device "$STORAGE_2B_MOUNT" "$STORAGE_2B_MAPPER" \
         "$STORAGE_2B_LVM_NAME" "$STORAGE_2B_LVM_GROUP" \
         "$STORAGE_2B_UUID" "$STORAGE_2B_KEY_FILE" "$STORAGE_2B_ENCRYPTION_TYPE" \
-        "$STORAGE_2B_OWNER_USER" "$STORAGE_2B_OWNER_GROUP" "$STORAGE_2B_MOUNT_OPTIONS"
+        "$STORAGE_2B_OWNER_USER" "$STORAGE_2B_OWNER_GROUP" "$STORAGE_2B_MOUNT_OPTIONS" || return "$FAILURE"
 
     # open network storage
     mount_network_path "$NETWORK_SHARE_ADDRESS" "$NETWORK_SHARE_MOUNT" "$NETWORK_SHARE_PROTOCOL" \
         "$NETWORK_SHARE_CREDENTIALS" "$NETWORK_SHARE_OWNER_USER" "$NETWORK_SHARE_OWNER_GROUP" \
-        "$NETWORK_SHARE_OPTIONS"
+        "$NETWORK_SHARE_OPTIONS" || return "$FAILURE"
+    
+    return "$SUCCESS"
 }
 
 function close_all_devices() {
@@ -228,8 +229,19 @@ function stop_all_services() {
 
 function system_on() {
     stop_all_services
-    open_all_devices
-    start_all_services
+    
+    if ! open_all_devices; then
+        echo "ERROR: Failed to open devices. Rolling back..."
+        close_all_devices
+        return "$FAILURE"
+    fi
+    
+    if ! start_all_services; then
+        echo "ERROR: Failed to start services. Rolling back..."
+        stop_all_services
+        close_all_devices
+        return "$FAILURE"
+    fi
 
     echo "========================"
     echo -e "   System is ON :)\n"

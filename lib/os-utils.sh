@@ -85,8 +85,7 @@ function build_mount_options() {
     
     # Get UID from username
     if [ "$l_owner_user" != "none" ]; then
-        l_uid=$(get_uid_from_username "$l_owner_user")
-        if [ $? -ne "$SUCCESS" ]; then
+        if ! l_uid=$(get_uid_from_username "$l_owner_user"); then
             echo "$l_uid"  # Print error message
             return "$FAILURE"
         fi
@@ -95,8 +94,7 @@ function build_mount_options() {
 
     # Get GID from groupname
     if [ "$l_owner_group" != "none" ]; then
-        l_gid=$(get_gid_from_groupname "$l_owner_group")
-        if [ $? -ne "$SUCCESS" ]; then
+        if ! l_gid=$(get_gid_from_groupname "$l_owner_group"); then
             echo "$l_gid"  # Print error message
             return "$FAILURE"
         fi
