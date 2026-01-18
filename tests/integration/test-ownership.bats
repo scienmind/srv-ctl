@@ -64,6 +64,10 @@ teardown_file() {
 }
 
 setup() {
+    # Define constants for test assertions
+    readonly SUCCESS=0
+    readonly FAILURE=1
+    
     source lib/os-utils.sh
     source lib/storage.sh
     

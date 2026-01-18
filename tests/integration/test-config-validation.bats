@@ -8,6 +8,10 @@ setup() {
     export PROJECT_ROOT
     PROJECT_ROOT="$(cd "$(dirname "$BATS_TEST_DIRNAME")/.." && pwd)"
     
+    # Define constants for test assertions
+    readonly SUCCESS=0
+    readonly FAILURE=1
+    
     # Backup existing config
     if [ -f "$PROJECT_ROOT/config.local" ]; then
         cp "$PROJECT_ROOT/config.local" "$PROJECT_ROOT/config.local.backup"
