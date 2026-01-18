@@ -15,37 +15,57 @@ setup_file() {
         skip "BitLocker support not available in cryptsetup (requires 2.4.0+)"
     fi
     
+    # Verify cryptsetup version supports BitLocker (2.4.0+)
+    local cryptsetup_version
+    cryptsetup_version=$(cryptsetup --version 2>&1 | head -1 | sed -n 's/cryptsetup \([0-9]\+\.[0-9]\+\).*/\1/p')
+    
+    if [ -z "$cryptsetup_version" ]; then
+        echo "ERROR: Could not determine cryptsetup version" >&3
+        exit 1
+    fi
+    
+    local major minor
+    major=$(echo "$cryptsetup_version" | cut -d. -f1)
+    minor=$(echo "$cryptsetup_version" | cut -d. -f2)
+    
+    if [ "$major" -lt 2 ] || { [ "$major" -eq 2 ] && [ "$minor" -lt 4 ]; }; then
+        skip "cryptsetup version $cryptsetup_version does not support BitLocker (requires 2.4.0+)"
+    fi
+    
     echo "Setting up BitLocker test environment..."
+    echo "cryptsetup version: $cryptsetup_version"
     
     # Check if pre-created BitLocker fixture exists
-    if [ -f "$TEST_BITLOCKER_FIXTURE" ]; then
-        echo "Using pre-created BitLocker test image"
-        cp "$TEST_BITLOCKER_FIXTURE" "$TEST_BITLOCKER_IMAGE"
-    else
-        echo "Pre-created BitLocker fixture not found, attempting to create with cryptsetup..."
-        # Try to create with cryptsetup (may fail if it only supports unlocking)
-        dd if=/dev/zero of="$TEST_BITLOCKER_IMAGE" bs=1M count=100 2>/dev/null
-        
-        # Setup loop device for creation attempt
-        local temp_loop=$(sudo losetup -f --show "$TEST_BITLOCKER_IMAGE")
-        
-        if ! echo "$TEST_BITLOCKER_PASSWORD" | sudo cryptsetup luksFormat --type bitlk "$temp_loop" - 2>/dev/null; then
-            sudo losetup -d "$temp_loop" 2>/dev/null || true
-            rm -f "$TEST_BITLOCKER_IMAGE"
-            skip "BitLocker fixture not available and cryptsetup cannot create BitLocker volumes. See tests/fixtures/bitlocker/README.md"
-        fi
-        
-        sudo losetup -d "$temp_loop" 2>/dev/null || true
+    if [ ! -f "$TEST_BITLOCKER_FIXTURE" ]; then
+        echo "ERROR: BitLocker fixture not found at $TEST_BITLOCKER_FIXTURE" >&3
+        echo "The fixture file should be in git. Check if it was cloned properly." >&3
+        exit 1
     fi
+    
+    echo "Using pre-created BitLocker test image"
+    cp "$TEST_BITLOCKER_FIXTURE" "$TEST_BITLOCKER_IMAGE"
     
     # Setup loop device for testing (with partition scanning for disk images)
     export TEST_BITLOCKER_LOOP=$(sudo losetup -f --show -P "$TEST_BITLOCKER_IMAGE")
+    if [ -z "$TEST_BITLOCKER_LOOP" ]; then
+        echo "ERROR: Failed to setup loop device for BitLocker image" >&3
+        rm -f "$TEST_BITLOCKER_IMAGE"
+        exit 1
+    fi
     
     # If using a disk image with partitions, use partition 1
     if [ -b "${TEST_BITLOCKER_LOOP}p1" ]; then
         export TEST_BITLOCKER_DEVICE="${TEST_BITLOCKER_LOOP}p1"
     else
         export TEST_BITLOCKER_DEVICE="$TEST_BITLOCKER_LOOP"
+    fi
+    
+    # Verify device exists
+    if [ ! -b "$TEST_BITLOCKER_DEVICE" ]; then
+        echo "ERROR: BitLocker device $TEST_BITLOCKER_DEVICE does not exist" >&3
+        sudo losetup -d "$TEST_BITLOCKER_LOOP" 2>/dev/null || true
+        rm -f "$TEST_BITLOCKER_IMAGE"
+        exit 1
     fi
     
     # Create key file (use printf to avoid trailing newline)
@@ -56,6 +76,11 @@ setup_file() {
     export TEST_BITLOCKER_UUID=$(sudo cryptsetup bitlkDump "$TEST_BITLOCKER_DEVICE" 2>/dev/null | grep "^GUID:" | awk '{print $2}')
     if [ -z "$TEST_BITLOCKER_UUID" ]; then
         echo "ERROR: Failed to extract BitLocker GUID from device" >&3
+        echo "Device: $TEST_BITLOCKER_DEVICE" >&3
+        echo "cryptsetup bitlkDump output:" >&3
+        sudo cryptsetup bitlkDump "$TEST_BITLOCKER_DEVICE" 2>&1 | head -20 >&3 || echo "bitlkDump failed" >&3
+        sudo losetup -d "$TEST_BITLOCKER_LOOP" 2>/dev/null || true
+        rm -f "$TEST_BITLOCKER_IMAGE"
         exit 1
     fi
     export TEST_BITLOCKER_UUID
