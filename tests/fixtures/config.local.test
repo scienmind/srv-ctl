@@ -1,0 +1,96 @@
+# -----------------------------------------------------------------------------
+# TEST CONFIGURATION - Safe values for CI/CD testing
+# -----------------------------------------------------------------------------
+# This file is used by automated tests. All devices are disabled by default
+# for safety. Tests will override specific values as needed.
+
+# Minimum cryptsetup version required (2.4.0+ supports modern unified syntax)
+readonly CRYPTSETUP_MIN_VERSION="2.4.0"
+
+# Syncthing users (set to "none" to disable)
+readonly ST_USER_1="none"
+readonly ST_USER_2="none"
+
+# Service names (automatically constructed from user names)
+readonly ST_SERVICE_1=$([ "$ST_USER_1" != "none" ] && echo "syncthing@${ST_USER_1}.service" || echo "none")
+readonly ST_SERVICE_2=$([ "$ST_USER_2" != "none" ] && echo "syncthing@${ST_USER_2}.service" || echo "none")
+readonly DOCKER_SERVICE="none"
+
+# -----------------------------------------------------------------------------
+# Primary data device configuration - DISABLED FOR TESTS
+# -----------------------------------------------------------------------------
+
+readonly PRIMARY_DATA_MOUNT="test-primary"
+readonly PRIMARY_DATA_MAPPER="test-primary-data"
+readonly PRIMARY_DATA_LVM_NAME="none"
+readonly PRIMARY_DATA_LVM_GROUP="vg-test"
+readonly PRIMARY_DATA_UUID="none"  # Disabled for safety
+readonly PRIMARY_DATA_KEY_FILE="none"
+readonly PRIMARY_DATA_ENCRYPTION_TYPE="luks"
+readonly PRIMARY_DATA_OWNER_USER="none"
+readonly PRIMARY_DATA_OWNER_GROUP="none"
+readonly PRIMARY_DATA_MOUNT_OPTIONS="defaults"
+
+# -----------------------------------------------------------------------------
+# Storage devices for Syncthing service 1 - DISABLED FOR TESTS
+# -----------------------------------------------------------------------------
+
+readonly STORAGE_1A_MOUNT="test-storage1a"
+readonly STORAGE_1A_MAPPER="test-storage1a-data"
+readonly STORAGE_1A_LVM_NAME="none"
+readonly STORAGE_1A_LVM_GROUP="vg-test"
+readonly STORAGE_1A_UUID="none"  # Disabled for safety
+readonly STORAGE_1A_KEY_FILE="none"
+readonly STORAGE_1A_ENCRYPTION_TYPE="luks"
+readonly STORAGE_1A_OWNER_USER="none"
+readonly STORAGE_1A_OWNER_GROUP="none"
+readonly STORAGE_1A_MOUNT_OPTIONS="defaults"
+
+readonly STORAGE_1B_MOUNT="test-storage1b"
+readonly STORAGE_1B_MAPPER="test-storage1b-data"
+readonly STORAGE_1B_LVM_NAME="none"
+readonly STORAGE_1B_LVM_GROUP="vg-test"
+readonly STORAGE_1B_UUID="none"  # Disabled for safety
+readonly STORAGE_1B_KEY_FILE="none"
+readonly STORAGE_1B_ENCRYPTION_TYPE="luks"
+readonly STORAGE_1B_OWNER_USER="none"
+readonly STORAGE_1B_OWNER_GROUP="none"
+readonly STORAGE_1B_MOUNT_OPTIONS="defaults"
+
+# -----------------------------------------------------------------------------
+# Storage devices for Syncthing service 2 - DISABLED FOR TESTS
+# -----------------------------------------------------------------------------
+
+readonly STORAGE_2A_MOUNT="test-storage2a"
+readonly STORAGE_2A_MAPPER="test-storage2a-data"
+readonly STORAGE_2A_LVM_NAME="none"
+readonly STORAGE_2A_LVM_GROUP="vg-test"
+readonly STORAGE_2A_UUID="none"  # Disabled for safety
+readonly STORAGE_2A_KEY_FILE="none"
+readonly STORAGE_2A_ENCRYPTION_TYPE="luks"
+readonly STORAGE_2A_OWNER_USER="none"
+readonly STORAGE_2A_OWNER_GROUP="none"
+readonly STORAGE_2A_MOUNT_OPTIONS="defaults"
+
+readonly STORAGE_2B_MOUNT="test-storage2b"
+readonly STORAGE_2B_MAPPER="test-storage2b-data"
+readonly STORAGE_2B_LVM_NAME="none"
+readonly STORAGE_2B_LVM_GROUP="vg-test"
+readonly STORAGE_2B_UUID="none"  # Disabled for safety
+readonly STORAGE_2B_KEY_FILE="none"
+readonly STORAGE_2B_ENCRYPTION_TYPE="luks"
+readonly STORAGE_2B_OWNER_USER="none"
+readonly STORAGE_2B_OWNER_GROUP="none"
+readonly STORAGE_2B_MOUNT_OPTIONS="defaults"
+
+# -----------------------------------------------------------------------------
+# Network share configuration - DISABLED FOR TESTS
+# -----------------------------------------------------------------------------
+
+readonly NETWORK_SHARE_ADDRESS="none"
+readonly NETWORK_SHARE_MOUNT="test-network"
+readonly NETWORK_SHARE_PROTOCOL="none"
+readonly NETWORK_SHARE_CREDENTIALS="none"
+readonly NETWORK_SHARE_OWNER_USER="none"
+readonly NETWORK_SHARE_OWNER_GROUP="none"
+readonly NETWORK_SHARE_OPTIONS="iocharset=utf8"

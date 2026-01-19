@@ -1,0 +1,54 @@
+name: System Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  vm:
+    name: sys-${{ matrix.os }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        # Only test OSes with cryptsetup >=2.4.0 (BitLocker support): Debian 12+, Ubuntu 22.04+
+        os: [debian-12, debian-13, ubuntu-22.04, ubuntu-24.04]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y qemu-system-x86 qemu-utils cloud-image-utils
+      
+      - name: Cache VM images
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/vm-images
+          key: vm-image-${{ matrix.os }}
+          
+      - name: Download cloud image
+        run: |
+          mkdir -p ~/.cache/vm-images
+          ./tests/vm/download-image.sh ${{ matrix.os }}
+      
+      - name: Run system tests (${{ matrix.os }})
+        timeout-minutes: 15
+        run: ./tests/vm/run-system-tests.sh ${{ matrix.os }}
+      
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: system-results-${{ matrix.os }}
+          path: tests/vm/results/
+          
+      - name: Cleanup
+        if: always()
+        run: ./tests/vm/cleanup.sh

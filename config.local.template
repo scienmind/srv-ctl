@@ -9,9 +9,9 @@ readonly CRYPTSETUP_MIN_VERSION="2.4.0"
 readonly ST_USER_1="none"  # Set to username to enable (e.g., "alice")
 readonly ST_USER_2="none"  # Set to username to enable (e.g., "bob")
 
-# Service names (automatically constructed)
-readonly ST_SERVICE_1="${ST_USER_1:+syncthing@${ST_USER_1}.service}"
-readonly ST_SERVICE_2="${ST_USER_2:+syncthing@${ST_USER_2}.service}"
+# Service names (automatically constructed from user names)
+readonly ST_SERVICE_1=$([ "$ST_USER_1" != "none" ] && echo "syncthing@${ST_USER_1}.service" || echo "none")
+readonly ST_SERVICE_2=$([ "$ST_USER_2" != "none" ] && echo "syncthing@${ST_USER_2}.service" || echo "none")
 readonly DOCKER_SERVICE="none"  # Set to "docker.service" to enable
 
 # -----------------------------------------------------------------------------
@@ -25,6 +25,9 @@ readonly PRIMARY_DATA_LVM_GROUP="vg-srv"  # LVM group name (used if LVM volume i
 readonly PRIMARY_DATA_UUID="none"  # Set to device UUID to enable (find with: sudo blkid)
 readonly PRIMARY_DATA_KEY_FILE="none"  # Set to key file path for automated unlock
 readonly PRIMARY_DATA_ENCRYPTION_TYPE="luks"  # Options: "luks" or "bitlocker"
+readonly PRIMARY_DATA_OWNER_USER="none"  # Set to username for mount ownership (e.g., "sync_srv")
+readonly PRIMARY_DATA_OWNER_GROUP="none"  # Set to group name for mount ownership (e.g., "sync_srv")
+readonly PRIMARY_DATA_MOUNT_OPTIONS="defaults"  # Additional mount options (umask, etc.)
 
 # -----------------------------------------------------------------------------
 # Storage devices for Syncthing service 1
@@ -37,6 +40,9 @@ readonly STORAGE_1A_LVM_GROUP="vg-srv"  # LVM group name (used if LVM volume is 
 readonly STORAGE_1A_UUID="none"  # Set to device UUID to enable (find with: sudo blkid)
 readonly STORAGE_1A_KEY_FILE="none"  # Set to key file path for automated unlock
 readonly STORAGE_1A_ENCRYPTION_TYPE="luks"  # Options: "luks" or "bitlocker"
+readonly STORAGE_1A_OWNER_USER="none"  # Set to username for mount ownership (e.g., "sync_srv")
+readonly STORAGE_1A_OWNER_GROUP="none"  # Set to group name for mount ownership (e.g., "sync_srv")
+readonly STORAGE_1A_MOUNT_OPTIONS="defaults"  # Additional mount options (umask, etc.)
 
 readonly STORAGE_1B_MOUNT="storage1b"  # Mount point under /mnt/
 readonly STORAGE_1B_MAPPER="storage1b-data"  # Device mapper name
@@ -45,6 +51,9 @@ readonly STORAGE_1B_LVM_GROUP="vg-srv"  # LVM group name (used if LVM volume is 
 readonly STORAGE_1B_UUID="none"  # Set to device UUID to enable (find with: sudo blkid)
 readonly STORAGE_1B_KEY_FILE="none"  # Set to key file path for automated unlock
 readonly STORAGE_1B_ENCRYPTION_TYPE="luks"  # Options: "luks" or "bitlocker"
+readonly STORAGE_1B_OWNER_USER="none"  # Set to username for mount ownership (e.g., "sync_srv")
+readonly STORAGE_1B_OWNER_GROUP="none"  # Set to group name for mount ownership (e.g., "sync_srv")
+readonly STORAGE_1B_MOUNT_OPTIONS="defaults"  # Additional mount options (umask, etc.)
 
 # -----------------------------------------------------------------------------
 # Storage devices for Syncthing service 2
@@ -57,6 +66,9 @@ readonly STORAGE_2A_LVM_GROUP="vg-srv"  # LVM group name (used if LVM volume is 
 readonly STORAGE_2A_UUID="none"  # Set to device UUID to enable (find with: sudo blkid)
 readonly STORAGE_2A_KEY_FILE="none"  # Set to key file path for automated unlock
 readonly STORAGE_2A_ENCRYPTION_TYPE="luks"  # Options: "luks" or "bitlocker"
+readonly STORAGE_2A_OWNER_USER="none"  # Set to username for mount ownership (e.g., "sync_srv")
+readonly STORAGE_2A_OWNER_GROUP="none"  # Set to group name for mount ownership (e.g., "sync_srv")
+readonly STORAGE_2A_MOUNT_OPTIONS="defaults"  # Additional mount options (umask, etc.)
 
 readonly STORAGE_2B_MOUNT="storage2b"  # Mount point under /mnt/
 readonly STORAGE_2B_MAPPER="storage2b-data"  # Device mapper name
@@ -65,6 +77,9 @@ readonly STORAGE_2B_LVM_GROUP="vg-srv"  # LVM group name (used if LVM volume is 
 readonly STORAGE_2B_UUID="none"  # Set to device UUID to enable (find with: sudo blkid)
 readonly STORAGE_2B_KEY_FILE="none"  # Set to key file path for automated unlock
 readonly STORAGE_2B_ENCRYPTION_TYPE="luks"  # Options: "luks" or "bitlocker"
+readonly STORAGE_2B_OWNER_USER="none"  # Set to username for mount ownership (e.g., "sync_srv")
+readonly STORAGE_2B_OWNER_GROUP="none"  # Set to group name for mount ownership (e.g., "sync_srv")
+readonly STORAGE_2B_MOUNT_OPTIONS="defaults"  # Additional mount options (umask, etc.)
 
 # -----------------------------------------------------------------------------
 # Network share configuration
@@ -74,4 +89,6 @@ readonly NETWORK_SHARE_ADDRESS="none"  # Set to share path to enable (e.g., "//s
 readonly NETWORK_SHARE_MOUNT="none"  # Set to mount name (e.g., "network")
 readonly NETWORK_SHARE_PROTOCOL="none"  # Set to protocol: "cifs", "nfs", etc.
 readonly NETWORK_SHARE_CREDENTIALS="none"  # Set to credentials file path
-readonly NETWORK_SHARE_OPTIONS="uid=1000,gid=1000,iocharset=utf8"  # Mount options
+readonly NETWORK_SHARE_OWNER_USER="none"  # Set to username for mount ownership (e.g., "sync_srv")
+readonly NETWORK_SHARE_OWNER_GROUP="none"  # Set to group name for mount ownership (e.g., "sync_srv")
+readonly NETWORK_SHARE_OPTIONS="iocharset=utf8"  # Additional mount options (vers=3.0, etc.)

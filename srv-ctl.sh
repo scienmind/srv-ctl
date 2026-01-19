@@ -19,7 +19,8 @@
 #   ./srv-ctl.sh stop               # Stop services and unmount devices
 #   ./srv-ctl.sh unlock-only        # Only unlock and mount devices
 #   ./srv-ctl.sh stop-services-only # Only stop services
-#   ./srv-ctl.sh validate-config    # Validate configuration
+#   ./srv-ctl.sh validate-config    # Validate configuration without making changes
+#   ./srv-ctl.sh help               # Show help message
 #
 # CONFIGURATION:
 #   Copy config.local.template to config.local and customize settings.
@@ -36,6 +37,24 @@ set -eou pipefail
 readonly SUCCESS=0
 readonly FAILURE=1
 
+# -----------------------------------------------------------------------------
+# Source library files
+# -----------------------------------------------------------------------------
+
+# Get the directory where this script resides
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_DIR
+
+# Source library functions
+# shellcheck disable=SC1091  # Library files exist
+source "${SCRIPT_DIR}/lib/os-utils.sh"
+source "${SCRIPT_DIR}/lib/storage.sh"
+
+
+# -----------------------------------------------------------------------------
+# Usage
+# -----------------------------------------------------------------------------
+
 function show_usage() {
     echo "Usage:   $0  < start | stop | unlock-only | stop-services-only | validate-config | help | -h >"
     echo ""
@@ -48,220 +67,10 @@ function show_usage() {
     echo "  help, -h            Show this help message"
 }
 
-function wait_for_device() {
-    local l_device_uuid="$1"
 
-    for i in {1..5}; do
-        if [ -e "/dev/disk/by-uuid/$l_device_uuid" ]; then
-            return $SUCCESS
-        else
-            echo "Waiting for device $l_device_uuid... ${i}s"
-            sleep 1
-        fi
-    done
-
-    echo "ERROR: Device \"$l_device_uuid\" is not available."
-    return $FAILURE
-}
-
-function verify_lvm() {
-    local l_lvm_name=$1
-    local l_lvm_group=$2
-
-    if lvdisplay "$l_lvm_group/$l_lvm_name" >/dev/null; then
-        return $SUCCESS
-    fi
-
-    echo "ERROR: Logic volume \"$l_lvm_name\" is not available."
-    return $FAILURE
-}
-
-function lvm_is_active() {
-    local l_lvm_name=$1
-    local l_lvm_group=$2
-
-    # Use lvs to check if volume is active (more reliable than parsing lvdisplay)
-    if lvs --noheadings -o lv_active "$l_lvm_group/$l_lvm_name" 2>/dev/null | grep -q "active"; then
-        return $SUCCESS
-    else
-        return $FAILURE
-    fi
-}
-
-function activate_lvm() {
-    local l_lvm_name=$1
-    local l_lvm_group=$2
-
-    if [ "$l_lvm_name" == "none" ] || [ "$l_lvm_group" == "none" ]; then
-        return $SUCCESS
-    fi
-
-    verify_lvm "$l_lvm_name" "$l_lvm_group"
-    if lvm_is_active "$l_lvm_name" "$l_lvm_group"; then
-        echo -e "Logic volume \"$l_lvm_name\" already activated. Skipping.\n"
-    else
-        echo "Activating $l_lvm_name..."
-        if ! lvchange -ay "$l_lvm_group/$l_lvm_name"; then
-            echo "ERROR: Failed to activate LVM logical volume \"$l_lvm_group/$l_lvm_name\""
-            return $FAILURE
-        fi
-        echo -e "Done\n"
-    fi
-}
-
-function deactivate_lvm() {
-    local l_lvm_name=$1
-    local l_lvm_group=$2
-
-    if [ "$l_lvm_name" == "none" ] || [ "$l_lvm_group" == "none" ]; then
-        return $SUCCESS
-    fi
-
-    verify_lvm "$l_lvm_name" "$l_lvm_group"
-
-    if lvm_is_active "$l_lvm_name" "$l_lvm_group"; then
-        echo "Deactivating $l_lvm_name..."
-        if ! lvchange -an "$l_lvm_group/$l_lvm_name"; then
-            echo "WARNING: Failed to deactivate LVM logical volume \"$l_lvm_group/$l_lvm_name\""
-            return $FAILURE
-        fi
-        echo -e "Done\n"
-    else
-        echo -e "Logic volume \"$l_lvm_name\" already deactivated. Skipping.\n"
-    fi
-}
-
-function unlock_device() {
-    local l_device_uuid=$1
-    local l_mapper=$2
-    local l_key_file=$3
-    local l_encryption_type=${4:-luks}
-
-    if [ "$l_device_uuid" == "none" ] || [ "$l_mapper" == "none" ]; then
-        echo -e "Device not configured (device_uuid=\"$l_device_uuid\"; mapper=\"$l_mapper\"). Skipping.\n"
-        return $SUCCESS
-    fi
-
-    # Check if already unlocked
-    if cryptsetup status "$l_mapper" >/dev/null; then
-        echo -e "Partition \"$l_mapper\" unlocked. Skipping.\n"
-        return $SUCCESS
-    fi
-
-    echo "Unlocking $l_mapper ($l_encryption_type)..."
-    wait_for_device "$l_device_uuid"
-    
-    # Determine the device path - prefer by-uuid for consistency
-    local l_device_path="/dev/disk/by-uuid/$l_device_uuid"
-
-    if [ "$l_encryption_type" == "bitlocker" ]; then
-        # BitLocker support using native cryptsetup (v2.4.0+)
-        if [ "$l_key_file" != "none" ] && [ -f "$l_key_file" ]; then
-            if ! cryptsetup open --type bitlk "$l_device_path" "$l_mapper" --key-file="$l_key_file"; then
-                echo "ERROR: Failed to unlock BitLocker device \"$l_device_uuid\" as \"$l_mapper\" using key file"
-                return $FAILURE
-            fi
-        else
-            if ! cryptsetup open --type bitlk "$l_device_path" "$l_mapper"; then
-                echo "ERROR: Failed to unlock BitLocker device \"$l_device_uuid\" as \"$l_mapper\" with interactive password"
-                return $FAILURE
-            fi
-        fi
-    elif [ "$l_encryption_type" == "luks" ]; then
-        # LUKS support
-        if [ "$l_key_file" != "none" ] && [ -f "$l_key_file" ]; then
-            if ! cryptsetup open --type luks "$l_device_path" "$l_mapper" --key-file="$l_key_file"; then
-                echo "ERROR: Failed to unlock LUKS device \"$l_device_uuid\" as \"$l_mapper\" using key file"
-                return $FAILURE
-            fi
-        else
-            if ! cryptsetup open --type luks "$l_device_path" "$l_mapper"; then
-                echo "ERROR: Failed to unlock LUKS device \"$l_device_uuid\" as \"$l_mapper\" with interactive password"
-                return $FAILURE
-            fi
-        fi
-    else
-        echo "ERROR: Unsupported encryption type \"$l_encryption_type\" for device \"$l_mapper\""
-        return $FAILURE
-    fi
-
-    echo -e "Done\n"
-}
-
-function lock_device() {
-    local l_mapper=$1
-    local l_encryption_type=${2:-luks}
-
-    if cryptsetup status "$l_mapper" >/dev/null; then
-        echo "Locking $l_mapper ($l_encryption_type)..."
-        if ! cryptsetup close "$l_mapper"; then
-            echo "WARNING: Failed to lock device \"$l_mapper\""
-            return $FAILURE
-        fi
-        echo -e "Done\n"
-    else
-        echo -e "Partition \"$l_mapper\" locked. Skipping.\n"
-    fi
-}
-
-function mount_network_path() {
-    local l_network_path=$1
-    local l_mount_path=$2
-    local l_protocol=$3
-    local l_credentials=$4
-    local l_options=$5
-
-    if [ "$l_protocol" == "none" ]; then
-        return $SUCCESS
-    fi
-
-    if mountpoint -q "/mnt/$l_mount_path"; then
-        echo -e "Mountpoint \"$l_mount_path\" mounted. Skipping.\n"
-    else
-        echo "Mounting $l_mount_path..."
-        mkdir -p "/mnt/$l_mount_path"
-        if ! mount -t "$l_protocol" -o "credentials=$l_credentials,$l_options" "$l_network_path" "/mnt/$l_mount_path"; then
-            echo "ERROR: Failed to mount network path \"$l_network_path\" to \"/mnt/$l_mount_path\""
-            return $FAILURE
-        fi
-        echo -e "Done\n"
-    fi
-}
-
-function mount_device() {
-    local l_mapper=$1
-    local l_mount=$2
-
-    if [ "$l_mapper" == "none" ] || [ "$l_mount" == "none" ]; then
-        echo -e "Mount not configured (mapper=\"$l_mapper\"; mount_point=\"$l_mount\"). Skipping.\n"
-    elif mountpoint -q "/mnt/$l_mount"; then
-        echo -e "Mountpoint \"$l_mount\" mounted. Skipping.\n"
-    else
-        echo "Mounting $l_mount..."
-        mkdir -p "/mnt/$l_mount"
-        if ! mount "/dev/mapper/$l_mapper" "/mnt/$l_mount"; then
-            echo "ERROR: Failed to mount \"/dev/mapper/$l_mapper\" to \"/mnt/$l_mount\""
-            return $FAILURE
-        fi
-        echo -e "Done\n"
-    fi
-}
-
-function unmount_device() {
-    local l_mount=$1
-
-    if mountpoint -q "/mnt/$l_mount"; then
-        echo "Unmounting $l_mount..."
-        if ! umount "/mnt/$l_mount"; then
-            echo "WARNING: Failed to unmount \"/mnt/$l_mount\""
-            return $FAILURE
-        else
-            echo -e "Done\n"
-        fi
-    else
-        echo -e "Mountpoint \"$l_mount\" unmounted. Skipping.\n"
-    fi
-}
+# -----------------------------------------------------------------------------
+# Device Orchestration (combines library primitives)
+# -----------------------------------------------------------------------------
 
 function open_device() {
     local l_mount=$1
@@ -271,15 +80,38 @@ function open_device() {
     local l_uuid=$5
     local l_key_file=$6
     local l_encryption_type=${7:-luks}
+    local l_owner_user=${8:-none}
+    local l_owner_group=${9:-none}
+    local l_additional_options=${10:-defaults}
 
-    # Step 1: Activate LVM
-    activate_lvm "$l_lvm_name" "$l_lvm_group" || return $FAILURE
+    # Check if device is configured - UUID is the primary enable/disable flag
+    if [ "$l_uuid" == "none" ]; then
+        echo -e "Device not configured (uuid=\"none\"). Skipping.\n"
+        return "$SUCCESS"
+    fi
+
+    # Validate that mapper and mount are also configured
+    if [ "$l_mapper" == "none" ] || [ "$l_mount" == "none" ]; then
+        echo "ERROR: Device UUID is set but mapper or mount point is 'none'"
+        echo "       UUID: $l_uuid, MAPPER: $l_mapper, MOUNT: $l_mount"
+        return "$FAILURE"
+    fi
+
+    # Build mount options from username/groupname
+    local l_mount_options
+    if ! l_mount_options=$(build_mount_options "$l_owner_user" "$l_owner_group" "$l_additional_options"); then
+        echo "$l_mount_options"  # Print error message
+        return "$FAILURE"
+    fi
+
+    # Step 1: Activate LVM (if configured)
+    activate_lvm "$l_lvm_name" "$l_lvm_group" || return "$FAILURE"
 
     # Step 2: Unlock encrypted device  
-    unlock_device "$l_uuid" "$l_mapper" "$l_key_file" "$l_encryption_type" || return $FAILURE
+    unlock_device "$l_uuid" "$l_mapper" "$l_key_file" "$l_encryption_type" || return "$FAILURE"
 
     # Step 3: Mount device
-    mount_device "$l_mapper" "$l_mount" || return $FAILURE
+    mount_device "$l_mapper" "$l_mount" "$l_mount_options" "$l_owner_user" "$l_owner_group" || return "$FAILURE"
 }
 
 function close_device() {
@@ -289,77 +121,55 @@ function close_device() {
     local l_lvm_group=$4
     local l_encryption_type=${5:-luks}
 
+    # Check if any component is configured before attempting cleanup
+    # Use mapper as the check since it's required for both lock and unmount
+    if [ "$l_mapper" == "none" ] && [ "$l_mount" == "none" ]; then
+        return "$SUCCESS"
+    fi
+
     # Continue cleanup even if individual steps fail
     unmount_device "$l_mount" || true
     lock_device "$l_mapper" "$l_encryption_type" || true
     deactivate_lvm "$l_lvm_name" "$l_lvm_group" || true
 }
 
-function stop_service() {
-    local l_service=$1
 
-    if [ "$l_service" == "none" ]; then
-        return $SUCCESS
-    fi
-
-    echo "Stopping \"$l_service\" service..."
-    if systemctl is-active --quiet "$l_service"; then
-        if ! systemctl stop "$l_service"; then
-            echo "WARNING: Failed to stop service \"$l_service\""
-            return $FAILURE
-        fi
-        echo -e "Done\n"
-    else
-        echo -e "Service \"$l_service\" inactive. Skipping.\n"
-    fi
-}
-
-function start_service() {
-    local l_service=$1
-
-    if [ "$l_service" == "none" ]; then
-        return $SUCCESS
-    fi
-
-    echo "Starting \"$l_service\" service..."
-    if systemctl is-active --quiet "$l_service"; then
-        echo -e "Service \"$l_service\" active. Skipping.\n"
-    else
-        if ! systemctl start "$l_service"; then
-            echo "ERROR: Failed to start service \"$l_service\""
-            return $FAILURE
-        fi
-        echo -e "Done\n"
-    fi
-}
 
 function open_all_devices() {
     # open primary data device
     open_device "$PRIMARY_DATA_MOUNT" "$PRIMARY_DATA_MAPPER" \
         "$PRIMARY_DATA_LVM_NAME" "$PRIMARY_DATA_LVM_GROUP" \
-        "$PRIMARY_DATA_UUID" "$PRIMARY_DATA_KEY_FILE" "$PRIMARY_DATA_ENCRYPTION_TYPE"
+        "$PRIMARY_DATA_UUID" "$PRIMARY_DATA_KEY_FILE" "$PRIMARY_DATA_ENCRYPTION_TYPE" \
+        "$PRIMARY_DATA_OWNER_USER" "$PRIMARY_DATA_OWNER_GROUP" "$PRIMARY_DATA_MOUNT_OPTIONS" || return "$FAILURE"
 
     # open storage devices for service 1
     open_device "$STORAGE_1A_MOUNT" "$STORAGE_1A_MAPPER" \
         "$STORAGE_1A_LVM_NAME" "$STORAGE_1A_LVM_GROUP" \
-        "$STORAGE_1A_UUID" "$STORAGE_1A_KEY_FILE" "$STORAGE_1A_ENCRYPTION_TYPE"
+        "$STORAGE_1A_UUID" "$STORAGE_1A_KEY_FILE" "$STORAGE_1A_ENCRYPTION_TYPE" \
+        "$STORAGE_1A_OWNER_USER" "$STORAGE_1A_OWNER_GROUP" "$STORAGE_1A_MOUNT_OPTIONS" || return "$FAILURE"
 
     open_device "$STORAGE_1B_MOUNT" "$STORAGE_1B_MAPPER" \
         "$STORAGE_1B_LVM_NAME" "$STORAGE_1B_LVM_GROUP" \
-        "$STORAGE_1B_UUID" "$STORAGE_1B_KEY_FILE" "$STORAGE_1B_ENCRYPTION_TYPE"
+        "$STORAGE_1B_UUID" "$STORAGE_1B_KEY_FILE" "$STORAGE_1B_ENCRYPTION_TYPE" \
+        "$STORAGE_1B_OWNER_USER" "$STORAGE_1B_OWNER_GROUP" "$STORAGE_1B_MOUNT_OPTIONS" || return "$FAILURE"
 
     # open storage devices for service 2
     open_device "$STORAGE_2A_MOUNT" "$STORAGE_2A_MAPPER" \
         "$STORAGE_2A_LVM_NAME" "$STORAGE_2A_LVM_GROUP" \
-        "$STORAGE_2A_UUID" "$STORAGE_2A_KEY_FILE" "$STORAGE_2A_ENCRYPTION_TYPE"
+        "$STORAGE_2A_UUID" "$STORAGE_2A_KEY_FILE" "$STORAGE_2A_ENCRYPTION_TYPE" \
+        "$STORAGE_2A_OWNER_USER" "$STORAGE_2A_OWNER_GROUP" "$STORAGE_2A_MOUNT_OPTIONS" || return "$FAILURE"
 
     open_device "$STORAGE_2B_MOUNT" "$STORAGE_2B_MAPPER" \
         "$STORAGE_2B_LVM_NAME" "$STORAGE_2B_LVM_GROUP" \
-        "$STORAGE_2B_UUID" "$STORAGE_2B_KEY_FILE" "$STORAGE_2B_ENCRYPTION_TYPE"
+        "$STORAGE_2B_UUID" "$STORAGE_2B_KEY_FILE" "$STORAGE_2B_ENCRYPTION_TYPE" \
+        "$STORAGE_2B_OWNER_USER" "$STORAGE_2B_OWNER_GROUP" "$STORAGE_2B_MOUNT_OPTIONS" || return "$FAILURE"
 
     # open network storage
     mount_network_path "$NETWORK_SHARE_ADDRESS" "$NETWORK_SHARE_MOUNT" "$NETWORK_SHARE_PROTOCOL" \
-        "$NETWORK_SHARE_CREDENTIALS" "$NETWORK_SHARE_OPTIONS"
+        "$NETWORK_SHARE_CREDENTIALS" "$NETWORK_SHARE_OWNER_USER" "$NETWORK_SHARE_OWNER_GROUP" \
+        "$NETWORK_SHARE_OPTIONS" || return "$FAILURE"
+    
+    return "$SUCCESS"
 }
 
 function close_all_devices() {
@@ -385,22 +195,26 @@ function close_all_devices() {
     unmount_device "$NETWORK_SHARE_MOUNT"
 }
 
+# -----------------------------------------------------------------------------
+# Service Orchestration
+# -----------------------------------------------------------------------------
+
 function start_all_services() {
     if [ "$ST_SERVICE_1" != "none" ] || [ "$ST_SERVICE_2" != "none" ] || [ "$DOCKER_SERVICE" != "none" ]; then
         echo "Reloading systemd units..."
         if ! systemctl daemon-reload; then
             echo "ERROR: Failed to reload systemd units"
-            return $FAILURE
+            return "$FAILURE"
         fi
         echo -e "Done\n"
     else
         echo -e "No services managed. Skipping.\n"
-        return $SUCCESS
+        return "$SUCCESS"
     fi
 
-    start_service "$ST_SERVICE_1"
-    start_service "$ST_SERVICE_2"
-    start_service "$DOCKER_SERVICE"
+    start_service "$ST_SERVICE_1" || return "$FAILURE"
+    start_service "$ST_SERVICE_2" || return "$FAILURE"
+    start_service "$DOCKER_SERVICE" || return "$FAILURE"
 }
 
 function stop_all_services() {
@@ -409,10 +223,25 @@ function stop_all_services() {
     stop_service "$DOCKER_SERVICE"
 }
 
+# -----------------------------------------------------------------------------
+# High-level Workflows
+# -----------------------------------------------------------------------------
+
 function system_on() {
     stop_all_services
-    open_all_devices
-    start_all_services
+    
+    if ! open_all_devices; then
+        echo "ERROR: Failed to open devices. Rolling back..."
+        close_all_devices
+        return "$FAILURE"
+    fi
+    
+    if ! start_all_services; then
+        echo "ERROR: Failed to start services. Rolling back..."
+        stop_all_services
+        close_all_devices
+        return "$FAILURE"
+    fi
 
     echo "========================"
     echo -e "   System is ON :)\n"
@@ -426,21 +255,20 @@ function system_off() {
     echo -e "   System is OFF :)\n"
 }
 
+# -----------------------------------------------------------------------------
+# Configuration and Requirements
+# -----------------------------------------------------------------------------
+
 function init_globals() {
     local l_config_file_name=$1
-    local l_script_dir
-    l_script_dir="$(
-        cd "$(dirname "${BASH_SOURCE[0]}")"
-        pwd
-    )"
-    local l_config_file="${l_script_dir}/${l_config_file_name}"
+    local l_config_file="${SCRIPT_DIR}/${l_config_file_name}"
 
     if [ -f "$l_config_file" ]; then
-        # shellcheck source=/dev/null
+        # shellcheck disable=SC1090  # Dynamic config file sourcing
         source "$l_config_file"
     else
         echo "ERROR: Configuration file \"$l_config_file_name\" is missing."
-        return $FAILURE
+        return "$FAILURE"
     fi
 }
 
@@ -451,21 +279,21 @@ function validate_encryption_type() {
     if [ "$l_encryption_type" != "luks" ] && [ "$l_encryption_type" != "bitlocker" ]; then
         echo "ERROR: Unknown encryption type \"$l_encryption_type\" for device \"$l_device_name\""
         echo "       Supported types: luks, bitlocker"
-        return $FAILURE
+        return "$FAILURE"
     fi
     
-    return $SUCCESS
+    return "$SUCCESS"
 }
 
 function verify_requirements() {
     if [ "$EUID" -ne "0" ]; then
         echo "ERROR: Please run as root"
-        return $FAILURE
+        return "$FAILURE"
     fi
 
     if ! command -v cryptsetup &>/dev/null; then
         echo "ERROR: 'cryptsetup' utility is not available"
-        return $FAILURE
+        return "$FAILURE"
     fi
 
     # Check for LVM utilities if needed
@@ -476,18 +304,18 @@ function verify_requirements() {
        [ "${PRIMARY_DATA_LVM_NAME:-none}" != "none" ]; then
         if ! command -v lvdisplay &>/dev/null; then
             echo "ERROR: 'lvm2' utility is not available"
-            return $FAILURE
+            return "$FAILURE"
         fi
     fi
 
     # Validate service configuration
     if [ "${ST_USER_1:-none}" != "none" ] && [ -z "${ST_SERVICE_1:-}" ]; then
         echo "ERROR: ST_USER_1 is set but ST_SERVICE_1 is empty"
-        return $FAILURE
+        return "$FAILURE"
     fi
     if [ "${ST_USER_2:-none}" != "none" ] && [ -z "${ST_SERVICE_2:-}" ]; then
         echo "ERROR: ST_USER_2 is set but ST_SERVICE_2 is empty"
-        return $FAILURE
+        return "$FAILURE"
     fi
 
     # Validate encryption types for all configured devices
@@ -503,7 +331,7 @@ function verify_requirements() {
         IFS=':' read -r device_name encryption_type device_uuid <<< "$device_info"
         # Only validate encryption type for enabled devices
         if [ "$device_uuid" != "none" ]; then
-            validate_encryption_type "$encryption_type" "$device_name" || return $FAILURE
+            validate_encryption_type "$encryption_type" "$device_name" || return "$FAILURE"
         fi
     done
 
@@ -517,26 +345,32 @@ function verify_requirements() {
     if [ "$l_version_check" != "$CRYPTSETUP_MIN_VERSION" ]; then
         echo "ERROR: cryptsetup version $CRYPTSETUP_MIN_VERSION or newer is required (current: $l_cryptsetup_version_current)"
         echo "       Version $CRYPTSETUP_MIN_VERSION+ is needed for full LUKS and BitLocker support"
-        return $FAILURE
+        return "$FAILURE"
     fi
 }
+
+# -----------------------------------------------------------------------------
+# Configuration Validation
+# -----------------------------------------------------------------------------
 
 function validate_config() {
     echo "=== Configuration Validation ==="
     
     local errors=0
     
+    # Get script directory first
+    local l_script_dir
+    l_script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    
     # Check config file exists
-    if [ ! -f "config.local" ]; then
+    if [ ! -f "${l_script_dir}/config.local" ]; then
         echo "❌ config.local not found (copy config.local.template and customize)"
-        return $FAILURE
+        return "$FAILURE"
     fi
     echo "✅ config.local found"
     
     # Load configuration
-    local l_script_dir
-    l_script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    # shellcheck source=/dev/null
+    # shellcheck disable=SC1090  # Dynamic config file sourcing
     source "${l_script_dir}/config.local"
     
     # Validate services
@@ -554,6 +388,8 @@ function validate_config() {
     echo ""
     echo "Storage Devices:"
     local enabled=0
+    local -A mapper_names  # Track mapper names to detect duplicates
+    
     for device in "Primary:PRIMARY_DATA" "1A:STORAGE_1A" "1B:STORAGE_1B" "2A:STORAGE_2A" "2B:STORAGE_2B"; do
         IFS=':' read -r label prefix <<< "$device"
         local uuid_var="${prefix}_UUID"
@@ -562,6 +398,18 @@ function validate_config() {
         if [ "$uuid" != "none" ]; then
             if _validate_device "$label" "$prefix"; then
                 enabled=$((enabled + 1))
+                
+                # Check for mapper name conflicts
+                local mapper_var="${prefix}_MAPPER"
+                local mapper="${!mapper_var:-none}"
+                if [ "$mapper" != "none" ]; then
+                    if [ -n "${mapper_names[$mapper]+_}" ]; then
+                        echo "❌ Mapper conflict: '$mapper' used by both ${mapper_names[$mapper]} and $label"
+                        errors=$((errors + 1))
+                    else
+                        mapper_names[$mapper]=$label
+                    fi
+                fi
             else
                 errors=$((errors + 1))
             fi
@@ -581,10 +429,10 @@ function validate_config() {
     echo ""
     if [ "$errors" -eq 0 ]; then
         echo "🎉 Validation PASSED ($enabled devices enabled)"
-        return $SUCCESS
+        return "$SUCCESS"
     else
         echo "❌ Validation FAILED ($errors errors)"
-        return $FAILURE
+        return "$FAILURE"
     fi
 }
 
@@ -594,13 +442,14 @@ function _validate_service() {
     if [ "$user" != "none" ]; then
         if [ -z "$service" ]; then
             echo "❌ $name: user '$user' set but service empty"
-            return $FAILURE
+            return "$FAILURE"
         else
             echo "✅ $name: $service (user: $user)"
         fi
     else
         echo "ℹ️  $name: disabled"
     fi
+    return "$SUCCESS"
 }
 
 function _validate_simple_service() {
@@ -610,15 +459,20 @@ function _validate_simple_service() {
     else
         echo "ℹ️  $name: disabled"
     fi
+    return "$SUCCESS"
 }
 
 function _validate_device() {
     local label=$1 prefix=$2
     local encryption_var="${prefix}_ENCRYPTION_TYPE" 
     local key_file_var="${prefix}_KEY_FILE"
+    local owner_user_var="${prefix}_OWNER_USER"
+    local owner_group_var="${prefix}_OWNER_GROUP"
     
     local encryption="${!encryption_var:-luks}"
     local key_file="${!key_file_var:-none}"
+    local owner_user="${!owner_user_var:-none}"
+    local owner_group="${!owner_group_var:-none}"
     
     local has_errors=false
     local error_details=""
@@ -647,59 +501,92 @@ function _validate_device() {
         key_status=" (interactive)"
     fi
     
+    # Validate owner user
+    if [ "$owner_user" != "none" ]; then
+        if ! id "$owner_user" &>/dev/null; then
+            if [ "$has_errors" = true ]; then
+                error_details="$error_details, user '$owner_user' does not exist"
+            else
+                error_details="user '$owner_user' does not exist"
+            fi
+            has_errors=true
+        fi
+    fi
+    
+    # Validate owner group
+    if [ "$owner_group" != "none" ]; then
+        if ! getent group "$owner_group" &>/dev/null; then
+            if [ "$has_errors" = true ]; then
+                error_details="$error_details, group '$owner_group' does not exist"
+            else
+                error_details="group '$owner_group' does not exist"
+            fi
+            has_errors=true
+        fi
+    fi
+    
     if [ "$has_errors" = true ]; then
         echo "❌ $label: $error_details"
-        return $FAILURE
+        return "$FAILURE"
     else
         echo "✅ $label: $encryption$key_status"
-        return $SUCCESS
+        return "$SUCCESS"
     fi
 }
 
 function _validate_network_share() {
+    local protocol="${NETWORK_SHARE_PROTOCOL:-none}"
     local address="${NETWORK_SHARE_ADDRESS:-none}"
     local credentials="${NETWORK_SHARE_CREDENTIALS:-none}"
     
-    if [ "$address" = "none" ]; then
+    if [ "$protocol" = "none" ]; then
         echo "ℹ️  disabled"
-        return $SUCCESS
+        return "$SUCCESS"
     fi
     
     if [ "$credentials" != "none" ] && [ ! -f "$credentials" ]; then
         echo "❌ enabled but credentials file not found: $credentials"
-        return $FAILURE
+        return "$FAILURE"
     fi
     
-    echo "✅ enabled ($address)"
-    return $SUCCESS
+    echo "✅ enabled ($protocol: $address)"
+    return "$SUCCESS"
 }
+
+# -----------------------------------------------------------------------------
+# Main Entry Point
+# -----------------------------------------------------------------------------
 
 function main() {
     if [ "$#" -ne 1 ]; then
         show_usage
-        exit $FAILURE
+        exit "$FAILURE"
     fi
 
     local l_action="$1"
 
-    # Handle commands that don't need root privileges
+    # Handle commands that don't need root privileges or requirements check
     case "$l_action" in
     validate-config)
         validate_config
         return $?
         ;;
-    help)
+    help|-h)
         show_usage
-        exit $SUCCESS
+        exit "$SUCCESS"
         ;;
-    -h)
+    start|stop|unlock-only|stop-services-only)
+        # Valid commands that need root and requirements
+        ;;
+    *)
+        # Invalid command
         show_usage
-        exit $SUCCESS
+        exit "$FAILURE"
         ;;
     esac
 
     init_globals "config.local"
-    verify_requirements "$@"
+    verify_requirements
 
     case "$l_action" in
     start)
@@ -713,10 +600,6 @@ function main() {
         ;;
     stop-services-only)
         stop_all_services
-        ;;
-    *)
-        show_usage
-        exit $FAILURE
         ;;
     esac
 }
