@@ -140,7 +140,7 @@ readonly ST_USER_2="none"
 readonly ST_SERVICE_1="none"
 readonly ST_SERVICE_2="none"
 readonly DOCKER_SERVICE="none"
-readonly SAMBA_SERVICE="test-dummy-service.service"
+readonly SAMBA_SERVICE="test-dummy-service"
 
 readonly PRIMARY_DATA_UUID="none"
 readonly STORAGE_1A_UUID="none"
@@ -160,16 +160,16 @@ EOF
     # Ensure test service is stopped
     sudo systemctl stop test-dummy-service 2>/dev/null || true
     
-    # Source srv-ctl and call start_all_services
-    run sudo bash -c "source $PROJECT_ROOT/config.local && source $PROJECT_ROOT/lib/os-utils.sh && start_all_services"
+    # Call start_service for SAMBA_SERVICE
+    run sudo bash -c "source $PROJECT_ROOT/config.local && source $PROJECT_ROOT/lib/os-utils.sh && start_service \"\$SAMBA_SERVICE\""
     [ "$status" -eq 0 ]
     
     # Verify test service is now running (Samba was started)
     run sudo systemctl is-active test-dummy-service
     [ "$status" -eq 0 ]
     
-    # Call stop_all_services
-    run sudo bash -c "source $PROJECT_ROOT/config.local && source $PROJECT_ROOT/lib/os-utils.sh && stop_all_services"
+    # Call stop_service for SAMBA_SERVICE
+    run sudo bash -c "source $PROJECT_ROOT/config.local && source $PROJECT_ROOT/lib/os-utils.sh && stop_service \"\$SAMBA_SERVICE\""
     [ "$status" -eq 0 ]
     
     # Verify test service is now stopped (Samba was stopped)

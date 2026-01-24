@@ -4,10 +4,10 @@
 #
 # DESCRIPTION:
 #   Manages encrypted storage devices, LVM volumes, and services for a multi-user
-#   Syncthing setup with support for LUKS/BitLocker encryption and network shares.
+#   setup with support for LUKS/BitLocker encryption and network shares.
 #
 # FEATURES:
-#   - Supports 2 parallel Syncthing services with separate users
+#   - Supports multiple systemd services (Syncthing, Docker, Samba, etc.)
 #   - Manages 5 storage devices (1 primary data + 4 paired storage devices)
 #   - LUKS and BitLocker encryption support via cryptsetup 2.4.0+
 #   - Optional LVM integration per device

@@ -86,7 +86,7 @@ Integration tests cover real storage operations (LUKS, LVM, mount, network share
 - **test-luks-keyfile.bats**: LUKS key file authentication (valid, missing, unreadable, wrong key, symlink, spaces, error handling)
 - **test-network-shares.bats**: Network share mounting (CIFS/NFS) with real Samba/NFS servers, credentials, error handling, idempotency, and permission scenarios
 - **test-bitlocker.bats**: BitLocker encryption support (unlock/lock with key files, error handling, idempotency, integration with srv-ctl.sh)
-- **test-services.bats**: Service management edge cases (start/stop, idempotency, error handling for nonexistent/failing services)
+- **test-services.bats**: Service management edge cases (start/stop, idempotency, error handling for nonexistent/failing services, SAMBA_SERVICE integration)
 
 All integration tests are run in CI via VM on all supported OSes.
 
@@ -94,7 +94,7 @@ All integration tests are run in CI via VM on all supported OSes.
 
 System tests validate full CLI workflows using srv-ctl.sh, including device orchestration, service management, and network share mounting. These tests use real services and config patching to simulate production scenarios.
 
-- **test-system.sh**: Covers start/stop/unlock workflows, config validation, error handling, multi-device orchestration (PRIMARY + multiple STORAGE + NETWORK_SHARE), and key file authentication tests as part of the main workflow.
+- **test-system.sh**: Covers start/stop/unlock workflows, config validation, error handling, multi-device orchestration (PRIMARY + multiple STORAGE + NETWORK_SHARE), service management (including SAMBA_SERVICE with real smbd), and key file authentication tests as part of the main workflow.
 
 All system tests are run in CI via VM on all supported OSes.
 
