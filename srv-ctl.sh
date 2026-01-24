@@ -200,7 +200,7 @@ function close_all_devices() {
 # -----------------------------------------------------------------------------
 
 function start_all_services() {
-    if [ "$ST_SERVICE_1" != "none" ] || [ "$ST_SERVICE_2" != "none" ] || [ "$DOCKER_SERVICE" != "none" ]; then
+    if [ "$ST_SERVICE_1" != "none" ] || [ "$ST_SERVICE_2" != "none" ] || [ "$DOCKER_SERVICE" != "none" ] || [ "$SAMBA_SERVICE" != "none" ]; then
         echo "Reloading systemd units..."
         if ! systemctl daemon-reload; then
             echo "ERROR: Failed to reload systemd units"
@@ -215,12 +215,14 @@ function start_all_services() {
     start_service "$ST_SERVICE_1" || return "$FAILURE"
     start_service "$ST_SERVICE_2" || return "$FAILURE"
     start_service "$DOCKER_SERVICE" || return "$FAILURE"
+    start_service "$SAMBA_SERVICE" || return "$FAILURE"
 }
 
 function stop_all_services() {
     stop_service "$ST_SERVICE_1"
     stop_service "$ST_SERVICE_2"
     stop_service "$DOCKER_SERVICE"
+    stop_service "$SAMBA_SERVICE"
 }
 
 # -----------------------------------------------------------------------------

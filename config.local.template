@@ -13,6 +13,7 @@ readonly ST_USER_2="none"  # Set to username to enable (e.g., "bob")
 readonly ST_SERVICE_1=$([ "$ST_USER_1" != "none" ] && echo "syncthing@${ST_USER_1}.service" || echo "none")
 readonly ST_SERVICE_2=$([ "$ST_USER_2" != "none" ] && echo "syncthing@${ST_USER_2}.service" || echo "none")
 readonly DOCKER_SERVICE="none"  # Set to "docker.service" to enable
+readonly SAMBA_SERVICE="none"  # Set to "smbd.service" to enable (for network shares)
 
 # -----------------------------------------------------------------------------
 # Primary data device configuration
