@@ -417,6 +417,132 @@ test_system_double_stop() {
     fi
 }
 
+# Test 19: System test - SAMBA_SERVICE management
+test_system_samba_service() {
+    run_test "System: SAMBA_SERVICE management with real smbd service"
+    
+    # Check if smbd is available
+    if ! systemctl list-unit-files | grep -q "smbd.service"; then
+        log_test "smbd.service not available, skipping SAMBA_SERVICE test"
+        pass_test "SAMBA_SERVICE test skipped (smbd not installed)"
+        return 0
+    fi
+    
+    # Stop smbd initially
+    sudo systemctl stop smbd 2>/dev/null || true
+    
+    # Load test environment to get variables
+    if [ ! -f /tmp/test_env.conf ]; then
+        fail_test "Test environment not set up"
+        return 1
+    fi
+    source /tmp/test_env.conf
+    
+    # Create config with SAMBA_SERVICE enabled (use existing config as base)
+    local key_file="/tmp/test_key.key"
+    cat > "$PROJECT_ROOT/config.local" <<EOF
+#!/usr/bin/env bash
+readonly CRYPTSETUP_MIN_VERSION="2.4.0"
+readonly ST_USER_1="none"
+readonly ST_SERVICE_1="test-dummy-service"
+readonly ST_USER_2="none"
+readonly ST_SERVICE_2="none"
+readonly DOCKER_SERVICE="none"
+readonly SAMBA_SERVICE="smbd.service"
+
+readonly PRIMARY_DATA_UUID="${TEST_LOOP_UUID}"
+readonly PRIMARY_DATA_KEY_FILE="${key_file}"
+readonly PRIMARY_DATA_ENCRYPTION_TYPE="luks"
+readonly PRIMARY_DATA_MAPPER="${TEST_LV_MAPPER}"
+readonly PRIMARY_DATA_LVM_NAME="${TEST_LV_NAME}"
+readonly PRIMARY_DATA_LVM_GROUP="${TEST_VG_NAME}"
+readonly PRIMARY_DATA_MOUNT="${TEST_MOUNT_POINT}"
+readonly PRIMARY_DATA_OWNER_USER="none"
+readonly PRIMARY_DATA_OWNER_GROUP="none"
+readonly PRIMARY_DATA_MOUNT_OPTIONS="defaults"
+readonly STORAGE_1A_UUID="none"
+readonly STORAGE_1A_KEY_FILE="none"
+readonly STORAGE_1A_ENCRYPTION_TYPE="luks"
+readonly STORAGE_1A_MAPPER="none"
+readonly STORAGE_1A_LVM_NAME="none"
+readonly STORAGE_1A_LVM_GROUP="none"
+readonly STORAGE_1A_MOUNT="none"
+readonly STORAGE_1A_OWNER_USER="none"
+readonly STORAGE_1A_OWNER_GROUP="none"
+readonly STORAGE_1A_MOUNT_OPTIONS="defaults"
+readonly STORAGE_1B_UUID="none"
+readonly STORAGE_1B_KEY_FILE="none"
+readonly STORAGE_1B_ENCRYPTION_TYPE="luks"
+readonly STORAGE_1B_MAPPER="none"
+readonly STORAGE_1B_LVM_NAME="none"
+readonly STORAGE_1B_LVM_GROUP="none"
+readonly STORAGE_1B_MOUNT="none"
+readonly STORAGE_1B_OWNER_USER="none"
+readonly STORAGE_1B_OWNER_GROUP="none"
+readonly STORAGE_1B_MOUNT_OPTIONS="defaults"
+readonly STORAGE_2A_UUID="none"
+readonly STORAGE_2A_KEY_FILE="none"
+readonly STORAGE_2A_ENCRYPTION_TYPE="luks"
+readonly STORAGE_2A_MAPPER="none"
+readonly STORAGE_2A_LVM_NAME="none"
+readonly STORAGE_2A_LVM_GROUP="none"
+readonly STORAGE_2A_MOUNT="none"
+readonly STORAGE_2A_OWNER_USER="none"
+readonly STORAGE_2A_OWNER_GROUP="none"
+readonly STORAGE_2A_MOUNT_OPTIONS="defaults"
+readonly STORAGE_2B_UUID="none"
+readonly STORAGE_2B_KEY_FILE="none"
+readonly STORAGE_2B_ENCRYPTION_TYPE="luks"
+readonly STORAGE_2B_MAPPER="none"
+readonly STORAGE_2B_LVM_NAME="none"
+readonly STORAGE_2B_LVM_GROUP="none"
+readonly STORAGE_2B_MOUNT="none"
+readonly STORAGE_2B_OWNER_USER="none"
+readonly STORAGE_2B_OWNER_GROUP="none"
+readonly STORAGE_2B_MOUNT_OPTIONS="defaults"
+readonly NETWORK_SHARE_PROTOCOL="none"
+readonly NETWORK_SHARE_ADDRESS="none"
+readonly NETWORK_SHARE_CREDENTIALS="none"
+readonly NETWORK_SHARE_MOUNT="none"
+readonly NETWORK_SHARE_OWNER_USER="none"
+readonly NETWORK_SHARE_OWNER_GROUP="none"
+readonly NETWORK_SHARE_OPTIONS="defaults"
+EOF
+    
+    # Start srv-ctl (should start smbd)
+    local start_output
+    start_output=$(sudo bash "$PROJECT_ROOT/srv-ctl.sh" start 2>&1)
+    if [ $? -eq 0 ]; then
+        if systemctl is-active --quiet smbd; then
+            pass_test "SAMBA_SERVICE started successfully"
+        else
+            fail_test "smbd not running after srv-ctl.sh start"
+            echo "$start_output"
+            return 1
+        fi
+    else
+        fail_test "srv-ctl.sh start failed with SAMBA_SERVICE"
+        echo "$start_output"
+        return 1
+    fi
+    
+    # Stop srv-ctl (should stop smbd)
+    if sudo bash "$PROJECT_ROOT/srv-ctl.sh" stop &>/dev/null; then
+        if ! systemctl is-active --quiet smbd; then
+            pass_test "SAMBA_SERVICE stopped successfully"
+        else
+            fail_test "smbd still running after srv-ctl.sh stop"
+            return 1
+        fi
+    else
+        fail_test "srv-ctl.sh stop failed with SAMBA_SERVICE"
+        return 1
+    fi
+    
+    # Restart smbd for subsequent tests (e.g., network shares)
+    sudo systemctl start smbd 2>/dev/null || true
+}
+
 # Setup system test environment (reuses integration test setup)
 setup_system_environment() {
     if [ "$EUID" -ne 0 ]; then
@@ -443,6 +569,23 @@ setup_system_environment() {
         echo -n "$TEST_PASSWORD" > "$key_file"
         chmod 600 "$key_file"
         
+        # Create test service for system tests
+        sudo tee /etc/systemd/system/test-dummy-service.service > /dev/null <<'EOFSERVICE'
+[Unit]
+Description=Dummy Test Service for srv-ctl System Tests
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/true
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOFSERVICE
+        
+        sudo systemctl daemon-reload
+        sudo systemctl stop test-dummy-service 2>/dev/null || true
 
         # Create system test config that uses the test environment
 
@@ -452,12 +595,13 @@ setup_system_environment() {
 
 readonly CRYPTSETUP_MIN_VERSION="2.4.0"
 
-# Services (ST_SERVICE_1 set to 'ssh' for system test)
+# Services (ST_SERVICE_1 set to 'test-dummy-service' for system test)
 readonly ST_USER_1="none"
-readonly ST_SERVICE_1="ssh"
+readonly ST_SERVICE_1="test-dummy-service"
 readonly ST_USER_2="none"
 readonly ST_SERVICE_2="none"
 readonly DOCKER_SERVICE="none"
+readonly SAMBA_SERVICE="none"
 
 # Primary Data Device (uses test environment)
 readonly PRIMARY_DATA_UUID="$TEST_LOOP_UUID"
@@ -526,6 +670,63 @@ readonly NETWORK_SHARE_OWNER_GROUP="none"
 readonly NETWORK_SHARE_OPTIONS="defaults"
 EOF
         
+        # Start services needed for network share tests
+        echo "Starting services for network share tests..."
+        
+        # Wait for cloud-init to complete (it configures Samba/NFS)
+        echo "Waiting for cloud-init to complete..."
+        timeout 120 cloud-init status --wait 2>/dev/null || echo "cloud-init wait timed out or not available"
+        
+        # Check and start Samba if available
+        if systemctl list-unit-files | grep -q "smbd.service"; then
+            echo "Found smbd.service, checking status..."
+            if ! systemctl is-active --quiet smbd 2>/dev/null; then
+                echo "Starting smbd service..."
+                if sudo systemctl start smbd 2>&1 | tee /tmp/smbd-start.log; then
+                    echo "smbd start command succeeded"
+                else
+                    log_fail "Warning: smbd start command failed:"
+                    cat /tmp/smbd-start.log
+                    sudo systemctl status smbd || true
+                fi
+            fi
+            if systemctl is-active --quiet smbd; then
+                echo "✓ smbd service is running"
+            else
+                log_fail "Warning: smbd service not running - CIFS tests may fail"
+                sudo systemctl status smbd || true
+            fi
+        else
+            log_fail "Warning: smbd.service not found - CIFS tests will be skipped"
+            echo "Available samba-related units:"
+            systemctl list-unit-files | grep -i smb || echo "None found"
+        fi
+        
+        # Check and start NFS if available
+        if systemctl list-unit-files | grep -q "nfs-server.service"; then
+            echo "Found nfs-server.service, checking status..."
+            if ! systemctl is-active --quiet nfs-server 2>/dev/null; then
+                echo "Starting nfs-server..."
+                if sudo systemctl start nfs-server 2>&1 | tee /tmp/nfs-start.log; then
+                    echo "nfs-server start command succeeded"
+                else
+                    log_fail "Warning: nfs-server start command failed:"
+                    cat /tmp/nfs-start.log
+                    sudo systemctl status nfs-server || true
+                fi
+            fi
+            if systemctl is-active --quiet nfs-server; then
+                echo "✓ nfs-server is running"
+            else
+                log_fail "Warning: nfs-server not running - NFS tests may fail"
+                sudo systemctl status nfs-server || true
+            fi
+        else
+            log_fail "Warning: nfs-server.service not found - NFS tests will be skipped"
+            echo "Available nfs-related units:"
+            systemctl list-unit-files | grep -i nfs || echo "None found"
+        fi
+        
         log_pass "System test environment setup complete"
         return 0
     else
@@ -539,6 +740,11 @@ cleanup_system_environment() {
     if [ "$EUID" -eq 0 ]; then
         # Ensure everything is stopped/unmounted
         sudo bash "$PROJECT_ROOT/srv-ctl.sh" stop &>/dev/null || true
+        
+        # Cleanup test service
+        sudo systemctl stop test-dummy-service 2>/dev/null || true
+        sudo rm -f /etc/systemd/system/test-dummy-service.service
+        sudo systemctl daemon-reload 2>/dev/null || true
         
         # Cleanup integration test environment
         if [ -f "$PROJECT_ROOT/tests/fixtures/cleanup-test-env.sh" ]; then
@@ -556,10 +762,13 @@ test_network_share_system_workflows() {
     echo ""
 
     # --- CIFS (Samba) ---
-    echo "[Setup] Verifying Samba test server (configured via cloud-init)..."
+    echo "[Setup] Verifying Samba test server..."
     if ! systemctl is-active --quiet smbd 2>/dev/null; then
-        echo "[WARN] Samba service not running, tests may fail"
-    fi
+        log_fail "ERROR: smbd service not running. CIFS tests cannot proceed."
+        log_fail "       This indicates a test environment setup failure."
+        fail_test "CIFS tests skipped - smbd not running"
+        # Skip CIFS tests but continue to NFS
+    else
 
     # Patch config.local for CIFS
     cat > "$PROJECT_ROOT/config.local" <<EOF
@@ -570,6 +779,7 @@ readonly ST_SERVICE_1="none"
 readonly ST_USER_2="none"
 readonly ST_SERVICE_2="none"
 readonly DOCKER_SERVICE="none"
+readonly SAMBA_SERVICE="none"
 readonly PRIMARY_DATA_UUID="none"
 readonly PRIMARY_DATA_MOUNT="none"
 readonly PRIMARY_DATA_MAPPER="none"
@@ -667,12 +877,17 @@ EOF
 
     # Cleanup credentials file (services stay running for potential reuse)
     sudo rm -f /tmp/smb-cred
+    fi  # End of CIFS tests
 
     # --- NFS ---
-    echo "[Setup] Verifying NFS test server (configured via cloud-init)..."
+    echo ""
+    echo "[Setup] Verifying NFS test server..."
     if ! systemctl is-active --quiet nfs-server 2>/dev/null; then
-        echo "[WARN] NFS service not running, tests may fail"
-    fi
+        log_fail "ERROR: nfs-server not running. NFS tests cannot proceed."
+        log_fail "       This indicates a test environment setup failure."
+        fail_test "NFS tests skipped - nfs-server not running"
+        # Skip NFS tests
+    else
 
     # Patch config.local for NFS
     cat > "$PROJECT_ROOT/config.local" <<EOF
@@ -683,6 +898,7 @@ readonly ST_SERVICE_1="none"
 readonly ST_USER_2="none"
 readonly ST_SERVICE_2="none"
 readonly DOCKER_SERVICE="none"
+readonly SAMBA_SERVICE="none"
 readonly PRIMARY_DATA_UUID="none"
 readonly PRIMARY_DATA_MOUNT="none"
 readonly PRIMARY_DATA_MAPPER="none"
@@ -770,6 +986,7 @@ EOF
     else
         fail_test "srv-ctl.sh stop failed for NFS"
     fi
+    fi  # End of NFS tests
 
     # NFS cleanup not needed - services configured via cloud-init stay running
 }
@@ -834,6 +1051,7 @@ readonly ST_SERVICE_1="none"
 readonly ST_USER_2="none"
 readonly ST_SERVICE_2="none"
 readonly DOCKER_SERVICE="none"
+readonly SAMBA_SERVICE="none"
 
 readonly PRIMARY_DATA_UUID="$TEST_LOOP_UUID"
 readonly PRIMARY_DATA_KEY_FILE="/tmp/test_key.key"
@@ -1098,6 +1316,7 @@ readonly ST_SERVICE_1="none"
 readonly ST_USER_2="none"
 readonly ST_SERVICE_2="none"
 readonly DOCKER_SERVICE="none"
+readonly SAMBA_SERVICE="none"
 
 readonly PRIMARY_DATA_UUID="$TEST_LOOP_UUID"
 readonly PRIMARY_DATA_KEY_FILE="/tmp/test_key.key"
@@ -1212,6 +1431,7 @@ main() {
         test_system_stop_services_only
         test_system_double_start
         test_system_double_stop
+        test_system_samba_service
 
         # Run real network share system tests (CIFS/NFS)
         test_network_share_system_workflows

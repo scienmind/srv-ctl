@@ -458,6 +458,7 @@ readonly ST_SERVICE_1="ssh"
 readonly ST_USER_2="none"
 readonly ST_SERVICE_2="none"
 readonly DOCKER_SERVICE="none"
+readonly SAMBA_SERVICE="none"
 
 # Primary Data Device (uses test environment)
 readonly PRIMARY_DATA_UUID="$TEST_LOOP_UUID"

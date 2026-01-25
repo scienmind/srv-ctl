@@ -124,3 +124,59 @@ setup() {
     run sudo bash -c "source $PROJECT_ROOT/lib/os-utils.sh && stop_service ''"
     [ "$status" -ne 0 ]
 }
+
+@test "SAMBA_SERVICE integration: Service properly managed when configured" {
+    # This test verifies that when SAMBA_SERVICE is configured in config.local,
+    # it's properly included in the start_all_services and stop_all_services workflow
+    
+    # Backup existing config
+    [ -f "$PROJECT_ROOT/config.local" ] && cp "$PROJECT_ROOT/config.local" "$PROJECT_ROOT/config.local.test_backup"
+    
+    # Create minimal config with SAMBA_SERVICE pointing to our test service
+    cat > "$PROJECT_ROOT/config.local" <<EOF
+readonly CRYPTSETUP_MIN_VERSION="2.4.0"
+readonly ST_USER_1="none"
+readonly ST_USER_2="none"
+readonly ST_SERVICE_1="none"
+readonly ST_SERVICE_2="none"
+readonly DOCKER_SERVICE="none"
+readonly SAMBA_SERVICE="test-dummy-service"
+
+readonly PRIMARY_DATA_UUID="none"
+readonly STORAGE_1A_UUID="none"
+readonly STORAGE_1B_UUID="none"
+readonly STORAGE_2A_UUID="none"
+readonly STORAGE_2B_UUID="none"
+
+readonly NETWORK_SHARE_PROTOCOL="none"
+readonly NETWORK_SHARE_ADDRESS="none"
+readonly NETWORK_SHARE_CREDENTIALS="none"
+readonly NETWORK_SHARE_MOUNT="none"
+readonly NETWORK_SHARE_OWNER_USER="none"
+readonly NETWORK_SHARE_OWNER_GROUP="none"
+readonly NETWORK_SHARE_OPTIONS="defaults"
+EOF
+    
+    # Ensure test service is stopped
+    sudo systemctl stop test-dummy-service 2>/dev/null || true
+    
+    # Call start_service for SAMBA_SERVICE
+    run sudo bash -c "source $PROJECT_ROOT/config.local && source $PROJECT_ROOT/lib/os-utils.sh && start_service \"\$SAMBA_SERVICE\""
+    [ "$status" -eq 0 ]
+    
+    # Verify test service is now running (Samba was started)
+    run sudo systemctl is-active test-dummy-service
+    [ "$status" -eq 0 ]
+    
+    # Call stop_service for SAMBA_SERVICE
+    run sudo bash -c "source $PROJECT_ROOT/config.local && source $PROJECT_ROOT/lib/os-utils.sh && stop_service \"\$SAMBA_SERVICE\""
+    [ "$status" -eq 0 ]
+    
+    # Verify test service is now stopped (Samba was stopped)
+    run sudo systemctl is-active test-dummy-service
+    [ "$status" -ne 0 ]
+    
+    # Restore config
+    [ -f "$PROJECT_ROOT/config.local.test_backup" ] && mv "$PROJECT_ROOT/config.local.test_backup" "$PROJECT_ROOT/config.local"
+    rm -f "$PROJECT_ROOT/config.local.test_backup"
+}

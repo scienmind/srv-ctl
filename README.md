@@ -40,7 +40,13 @@ readonly ST_USER_2="bob"
 # Service names (constructed automatically)
 readonly ST_SERVICE_1="syncthing@${ST_USER_1}.service"
 readonly ST_SERVICE_2="syncthing@${ST_USER_2}.service"
+
+# Additional services (set to "none" to disable)
+readonly DOCKER_SERVICE="docker.service"  # Manage Docker service
+readonly SAMBA_SERVICE="smbd.service"     # Manage Samba service (for network shares)
 ```
+
+All configured services are started when running `srv-ctl.sh start` and stopped when running `srv-ctl.sh stop`.
 
 ### Storage Device Configuration
 
