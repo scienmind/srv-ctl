@@ -236,6 +236,7 @@ function mount_device() {
     local l_mount_options=${3:-defaults}
     local l_owner_user=${4:-none}
     local l_owner_group=${5:-none}
+    local l_fs_type=${6:-auto}
 
     if [ "$l_mapper" == "none" ] || [ "$l_mount" == "none" ]; then
         echo -e "Mount not configured (mapper=\"$l_mapper\"; mount_point=\"$l_mount\"). Skipping.\n"
@@ -251,14 +252,21 @@ function mount_device() {
         
         echo "Mounting $l_mount..."
         mkdir -p "/mnt/$l_mount"
-        
-        if ! mount -o "$l_mount_options" "/dev/mapper/$l_mapper" "/mnt/$l_mount"; then
+
+        local l_mount_type_args=()
+        if [ "$l_fs_type" = "ntfs3" ]; then
+            l_mount_type_args=(-t "$l_fs_type")
+        fi
+
+        if ! mount "${l_mount_type_args[@]}" -o "$l_mount_options" "/dev/mapper/$l_mapper" "/mnt/$l_mount"; then
             echo "ERROR: Failed to mount \"/dev/mapper/$l_mapper\" to \"/mnt/$l_mount\""
             return "$FAILURE"
         fi
-        
-        # Set ownership if specified
-        if [ "$l_owner_user" != "none" ] || [ "$l_owner_group" != "none" ]; then
+
+        # Set ownership if specified.
+        # Note: ntfs3 derives ownership from mount-time uid=/gid= options (set by
+        # build_mount_options), so post-mount chown is unnecessary and skipped.
+        if [ "$l_fs_type" != "ntfs3" ] && { [ "$l_owner_user" != "none" ] || [ "$l_owner_group" != "none" ]; }; then
             local chown_target=""
             if [ "$l_owner_user" != "none" ] && [ "$l_owner_group" != "none" ]; then
                 chown_target="$l_owner_user:$l_owner_group"

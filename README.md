@@ -56,6 +56,7 @@ Each storage device supports:
 - **Device Mapper**: Name for the unlocked device
 - **LVM Support**: Optional logical volume management
 - **Encryption Type**: Either `luks` or `bitlocker`
+- **Filesystem Type**: `auto` (default) or `ntfs3` for kernel NTFS driver
 - **Key Files**: Optional for automated unlocking
 - **Ownership**: Optional user/group for mount point
 - **Mount Options**: Additional filesystem mount options
@@ -70,6 +71,7 @@ readonly STORAGE_2A_LVM_GROUP="vg-srv"          # LVM group (used if LVM enabled
 readonly STORAGE_2A_UUID="your-device-uuid"     # Device UUID (find with: sudo blkid)
 readonly STORAGE_2A_KEY_FILE="/path/to/key"     # Key file path ("none" for interactive)
 readonly STORAGE_2A_ENCRYPTION_TYPE="bitlocker" # "luks" or "bitlocker"
+readonly STORAGE_2A_FS_TYPE="ntfs3"             # "auto" or "ntfs3" (uses mount -t ntfs3)
 readonly STORAGE_2A_OWNER_USER="sync_srv"       # Mount ownership user ("none" to skip)
 readonly STORAGE_2A_OWNER_GROUP="sync_srv"      # Mount ownership group ("none" to skip)
 readonly STORAGE_2A_MOUNT_OPTIONS="defaults"    # Additional mount options

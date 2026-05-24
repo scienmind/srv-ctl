@@ -83,6 +83,7 @@ function open_device() {
     local l_owner_user=${8:-none}
     local l_owner_group=${9:-none}
     local l_additional_options=${10:-defaults}
+    local l_fs_type=${11:-auto}
 
     # Check if device is configured - UUID is the primary enable/disable flag
     if [ "$l_uuid" == "none" ]; then
@@ -111,7 +112,7 @@ function open_device() {
     unlock_device "$l_uuid" "$l_mapper" "$l_key_file" "$l_encryption_type" || return "$FAILURE"
 
     # Step 3: Mount device
-    mount_device "$l_mapper" "$l_mount" "$l_mount_options" "$l_owner_user" "$l_owner_group" || return "$FAILURE"
+    mount_device "$l_mapper" "$l_mount" "$l_mount_options" "$l_owner_user" "$l_owner_group" "$l_fs_type" || return "$FAILURE"
 }
 
 function close_device() {
@@ -140,29 +141,34 @@ function open_all_devices() {
     open_device "$PRIMARY_DATA_MOUNT" "$PRIMARY_DATA_MAPPER" \
         "$PRIMARY_DATA_LVM_NAME" "$PRIMARY_DATA_LVM_GROUP" \
         "$PRIMARY_DATA_UUID" "$PRIMARY_DATA_KEY_FILE" "$PRIMARY_DATA_ENCRYPTION_TYPE" \
-        "$PRIMARY_DATA_OWNER_USER" "$PRIMARY_DATA_OWNER_GROUP" "$PRIMARY_DATA_MOUNT_OPTIONS" || return "$FAILURE"
+        "$PRIMARY_DATA_OWNER_USER" "$PRIMARY_DATA_OWNER_GROUP" "$PRIMARY_DATA_MOUNT_OPTIONS" \
+        "$PRIMARY_DATA_FS_TYPE" || return "$FAILURE"
 
     # open storage devices for service 1
     open_device "$STORAGE_1A_MOUNT" "$STORAGE_1A_MAPPER" \
         "$STORAGE_1A_LVM_NAME" "$STORAGE_1A_LVM_GROUP" \
         "$STORAGE_1A_UUID" "$STORAGE_1A_KEY_FILE" "$STORAGE_1A_ENCRYPTION_TYPE" \
-        "$STORAGE_1A_OWNER_USER" "$STORAGE_1A_OWNER_GROUP" "$STORAGE_1A_MOUNT_OPTIONS" || return "$FAILURE"
+        "$STORAGE_1A_OWNER_USER" "$STORAGE_1A_OWNER_GROUP" "$STORAGE_1A_MOUNT_OPTIONS" \
+        "$STORAGE_1A_FS_TYPE" || return "$FAILURE"
 
     open_device "$STORAGE_1B_MOUNT" "$STORAGE_1B_MAPPER" \
         "$STORAGE_1B_LVM_NAME" "$STORAGE_1B_LVM_GROUP" \
         "$STORAGE_1B_UUID" "$STORAGE_1B_KEY_FILE" "$STORAGE_1B_ENCRYPTION_TYPE" \
-        "$STORAGE_1B_OWNER_USER" "$STORAGE_1B_OWNER_GROUP" "$STORAGE_1B_MOUNT_OPTIONS" || return "$FAILURE"
+        "$STORAGE_1B_OWNER_USER" "$STORAGE_1B_OWNER_GROUP" "$STORAGE_1B_MOUNT_OPTIONS" \
+        "$STORAGE_1B_FS_TYPE" || return "$FAILURE"
 
     # open storage devices for service 2
     open_device "$STORAGE_2A_MOUNT" "$STORAGE_2A_MAPPER" \
         "$STORAGE_2A_LVM_NAME" "$STORAGE_2A_LVM_GROUP" \
         "$STORAGE_2A_UUID" "$STORAGE_2A_KEY_FILE" "$STORAGE_2A_ENCRYPTION_TYPE" \
-        "$STORAGE_2A_OWNER_USER" "$STORAGE_2A_OWNER_GROUP" "$STORAGE_2A_MOUNT_OPTIONS" || return "$FAILURE"
+        "$STORAGE_2A_OWNER_USER" "$STORAGE_2A_OWNER_GROUP" "$STORAGE_2A_MOUNT_OPTIONS" \
+        "$STORAGE_2A_FS_TYPE" || return "$FAILURE"
 
     open_device "$STORAGE_2B_MOUNT" "$STORAGE_2B_MAPPER" \
         "$STORAGE_2B_LVM_NAME" "$STORAGE_2B_LVM_GROUP" \
         "$STORAGE_2B_UUID" "$STORAGE_2B_KEY_FILE" "$STORAGE_2B_ENCRYPTION_TYPE" \
-        "$STORAGE_2B_OWNER_USER" "$STORAGE_2B_OWNER_GROUP" "$STORAGE_2B_MOUNT_OPTIONS" || return "$FAILURE"
+        "$STORAGE_2B_OWNER_USER" "$STORAGE_2B_OWNER_GROUP" "$STORAGE_2B_MOUNT_OPTIONS" \
+        "$STORAGE_2B_FS_TYPE" || return "$FAILURE"
 
     # open network storage
     mount_network_path "$NETWORK_SHARE_ADDRESS" "$NETWORK_SHARE_MOUNT" "$NETWORK_SHARE_PROTOCOL" \
@@ -296,6 +302,26 @@ function verify_requirements() {
     if ! command -v cryptsetup &>/dev/null; then
         echo "ERROR: 'cryptsetup' utility is not available"
         return "$FAILURE"
+    fi
+
+    # Check ntfs3 support only when explicitly requested by configuration
+    local l_ntfs3_requested=false
+    for fs_type in "${PRIMARY_DATA_FS_TYPE:-auto}" "${STORAGE_1A_FS_TYPE:-auto}" "${STORAGE_1B_FS_TYPE:-auto}" \
+        "${STORAGE_2A_FS_TYPE:-auto}" "${STORAGE_2B_FS_TYPE:-auto}"; do
+        if [ "$fs_type" = "ntfs3" ]; then
+            l_ntfs3_requested=true
+            break
+        fi
+    done
+
+    if [ "$l_ntfs3_requested" = true ]; then
+        # ntfs3 may be a module that is autoloaded on first mount, so accept either:
+        #   - already-loaded/built-in (listed in /proc/filesystems), or
+        #   - available as a loadable module (modinfo succeeds)
+        if ! grep -qw "ntfs3" /proc/filesystems && ! modinfo ntfs3 &>/dev/null; then
+            echo "ERROR: Filesystem type 'ntfs3' requested but not supported by this kernel"
+            return "$FAILURE"
+        fi
     fi
 
     # Check for LVM utilities if needed
@@ -467,11 +493,13 @@ function _validate_simple_service() {
 function _validate_device() {
     local label=$1 prefix=$2
     local encryption_var="${prefix}_ENCRYPTION_TYPE" 
+    local fs_type_var="${prefix}_FS_TYPE"
     local key_file_var="${prefix}_KEY_FILE"
     local owner_user_var="${prefix}_OWNER_USER"
     local owner_group_var="${prefix}_OWNER_GROUP"
     
     local encryption="${!encryption_var:-luks}"
+    local fs_type="${!fs_type_var:-auto}"
     local key_file="${!key_file_var:-none}"
     local owner_user="${!owner_user_var:-none}"
     local owner_group="${!owner_group_var:-none}"
@@ -482,6 +510,19 @@ function _validate_device() {
     # Validate encryption type
     if [ "$encryption" != "luks" ] && [ "$encryption" != "bitlocker" ]; then
         error_details="invalid encryption '$encryption'"
+        has_errors=true
+    fi
+
+    # Validate filesystem type selector
+    if [ -z "$fs_type" ]; then
+        fs_type="auto"
+    fi
+    if [ "$fs_type" != "auto" ] && [ "$fs_type" != "ntfs3" ]; then
+        if [ "$has_errors" = true ]; then
+            error_details="$error_details, invalid fs type '$fs_type'"
+        else
+            error_details="invalid fs type '$fs_type'"
+        fi
         has_errors=true
     fi
     
@@ -531,7 +572,11 @@ function _validate_device() {
         echo "❌ $label: $error_details"
         return "$FAILURE"
     else
-        echo "✅ $label: $encryption$key_status"
+        local fs_info=""
+        if [ "$fs_type" != "auto" ]; then
+            fs_info=", fs=$fs_type"
+        fi
+        echo "✅ $label: $encryption$fs_info$key_status"
         return "$SUCCESS"
     fi
 }
